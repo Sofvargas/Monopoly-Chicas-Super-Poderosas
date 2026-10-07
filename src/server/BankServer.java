@@ -17,12 +17,13 @@ public class BankServer {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("Bank is waiting for players to connect...");
             
+            Bank mainBank = new Bank(); // Instancia del banco que manejará la lógica del juego
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("New player connected: " + clientSocket.getInetAddress().getHostAddress());
                 
                 // Creamos un nuevo hilo para cada jugadora que se conecta
-                ClientHandler clientThread = new ClientHandler(clientSocket);
+                ClientHandler clientThread = new ClientHandler(clientSocket, mainBank);
                 connectedClients.add(clientThread);
                 new Thread(clientThread).start();
             }
