@@ -18,7 +18,7 @@ public class GameClient {
              Scanner scanner = new Scanner(System.in)) {
 
             System.out.println("Connected to Bank Server!");
-            out.println("CONECTAR,Player_1");
+            out.println("CONECTAR,Player_1"); // cambiar por el ID real del cliente
 
             // Hilo para escuchar respuestas del servidor simultáneamente
             Thread listenerThread = new Thread(() -> {
