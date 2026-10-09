@@ -160,8 +160,11 @@ public class BankServer {
 
     private static void announceRoll(String player, int d1, int d2) {
         broadcast("DADOS," + player + "," + d1 + "," + d2);
-        // PENDIENTE (clases Juego / Banco): mover la ficha de 'player' d1 + d2
-        // casillas por la lista circular, cobrar/pagar y crear las transacciones.
+        // Mueve la ficha por el tablero circular, cobra el salario y avisa a todos
+        for (String line : session.applyRoll(d1, d2)) {
+            broadcast(line);
+        }
+        // PENDIENTE (Juego/Banco): comprar propiedad, cobrar alquiler, cartas de evento.
     }
 
     // ---------------------------------------------------------------- ayuda

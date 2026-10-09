@@ -15,16 +15,12 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import models.Tablero;
 
 public class Interfaz {
 
     private static final int TOTAL_CASILLAS = 24;
-    private static final String[] NOMBRES = {
-        "Inicio", "Laboratorio", "Carta sorpresa", "Parque", "Escuela", "Biblioteca",
-        "Cárcel", "Heladería", "Museo", "Carta sorpresa", "Cine", "Estación",
-        "Estacionamiento", "Pastelería", "Zoológico", "Carta sorpresa", "Plaza", "Teatro",
-        "Ir a la cárcel", "Banco", "Playa", "Carta sorpresa", "Aeropuerto", "Castillo"
-    };
+    private static final String[] NOMBRES = Tablero.NOMBRES; // mismo orden que el tablero del servidor
     private static final int LADO = TOTAL_CASILLAS / 4; // 6 casillas por lado
 
     private final BorderPane root = new BorderPane();
@@ -124,6 +120,8 @@ public class Interfaz {
                 mostrarMensaje("Turno de " + turnoActual);
             }
             case "DADOS" -> mostrarDados(p, linea);
+            case "POSICION" -> mostrarMensaje(p[1] + " avanzó a " + p[3] + " (casilla " + p[2] + ")");
+            case "SALDO" -> mostrarMensaje("Saldo de " + p[1] + ": $" + p[2]);
             case "TARJETA" -> mostrarMensaje("Tarjeta leída: " + (p.length > 1 ? p[1] : ""));
             case "ERROR" -> mostrarMensaje("Error: " + (p.length > 1 ? p[1] : linea));
             case "OK" -> { /* confirmacion que no hace falta mostrar */ }
