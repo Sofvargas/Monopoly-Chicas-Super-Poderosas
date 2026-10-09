@@ -1,0 +1,19 @@
+# Maven (archivos generados al compilar)
+target/
+
+# Configuracion personal de editores
+.vscode/
+.idea/
+*.iml
+
+# Archivos que VS Code Java genera en el proyecto
+.classpath
+.project
+.settings/
+
+# Archivos del sistema (Mac y Windows)
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
