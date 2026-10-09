@@ -5,16 +5,15 @@ import network
 import socket
 from mfrc522 import MFRC522
 
-# Configuración 
+#Configuración 
 SSID = "Mari"
 PASSWORD = "Mari2016"
-PORT = 8080              # puerto TCP donde Java se conecta a la rasp
+PORT = 8080              # puerto TCP donde Java se conecta a la Pico
 
-BOTON_PIN = 19           
+BOTON_PIN = 19          
 SEG_ON = 0               # ánodo común
 DIG_ON = 0               # transistores PNP
-
-# Display (se refresca solo con un Timer)
+#Display (se refresca solo con un Timer) 
 segmentos = [Pin(n, Pin.OUT) for n in (14, 13, 12, 11, 18, 17, 16)]  # a b c d e f g
 digitos = [Pin(9, Pin.OUT), Pin(10, Pin.OUT)]                         # [0]=dado 1, [1]=dado 2
 dp = Pin(15, Pin.OUT)
@@ -31,11 +30,12 @@ PATRONES = {
     6:   [1, 0, 1, 1, 1, 1, 1],
 }
 
-valores = ["-", "-"]     # lo que muestra cada dígito
+valores = ["-", "-"]     #lo que muestra cada dígito; el programa solo cambia esto
 pos = 0
 
 def refrescar_display(t):
-    # Cada 4 ms muestra un dígito y alterna.
+    # Cada 4 ms muestra un dígito y alterna
+    # así el display no parpadea aunque el lector o la red tarden.
     global pos
     digitos[0].value(1 - DIG_ON)
     digitos[1].value(1 - DIG_ON)
@@ -48,11 +48,11 @@ def refrescar_display(t):
 timer_display = Timer(-1)
 timer_display.init(period=4, mode=Timer.PERIODIC, callback=refrescar_display)
 
-# Wi-Fi y servidor TCP
+#Wi-Fi y servidor TCP 
 def Conexion_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    # Desactiva el ahorro de energía del Wi-Fi: si no la rasp no atiende bien las conexiones entrantes (el servidor TCP no respondía a Java)
+    #Desactiva el ahorro de energía del Wi-Fi: sin esto la Pico W no atiende bien las conexiones entrantes (el servidor TCP no respondía a Java)
     try:
         wlan.config(pm=0xa11140)
     except Exception as e:
@@ -83,9 +83,9 @@ def Iniciar_server():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        s.bind(("0.0.0.0", PORT))     # escucha en la IP que le dé el dispositivo
-        s.listen(1)
-        s.setblocking(False)          # accept() no se queda esperando
+        s.bind(("0.0.0.0", PORT))     #escucha en la IP que le dé el router
+        s.listen(3)
+        s.setblocking(False)          #accept() no se queda esperando
         print("Servidor TCP escuchando en puerto", PORT)
         return s
     except Exception as e:
@@ -93,25 +93,24 @@ def Iniciar_server():
         s.close()
         return None
 
-cliente = None
+clientes = []          # todos los que están conectados
+MAX_CLIENTES = 3
 
 def enviar(linea):
-    # Manda una línea de texto a Java. Si no hay Java conectado, solo la imprime.
-    global cliente
+    # Manda la línea a TODOS los clientes conectados
     print("->", linea)
-    if cliente is None:
-        return
-    try:
-        cliente.send((linea + "\n").encode("utf-8"))
-    except OSError:
-        print("Java se desconectó")
+    datos = (linea + "\n").encode("utf-8")
+    for c in clientes[:]:
         try:
-            cliente.close()
+            c.send(datos)
         except OSError:
-            pass
-        cliente = None
-
-# Botón (con interrupción, no se pierde ninguna pulsación) 
+            print("Un cliente se desconectó")
+            try:
+                c.close()
+            except OSError:
+                pass
+            clientes.remove(c)
+#Botón (con interrupción, no se pierde ninguna pulsación) 
 boton = Pin(BOTON_PIN, Pin.IN, Pin.PULL_UP)
 pulsado = False
 t_boton = ticks_add(ticks_ms(), -1000)
@@ -119,7 +118,7 @@ t_boton = ticks_add(ticks_ms(), -1000)
 def al_pulsar(pin):
     global pulsado, t_boton
     ahora = ticks_ms()
-    if ticks_diff(ahora, t_boton) > 250:     # antirrebote
+    if ticks_diff(ahora, t_boton) > 250:     #antirrebote
         t_boton = ahora
         pulsado = True
 
@@ -144,21 +143,25 @@ t_uid = 0
 
 print("Listo: pulsá el botón para tirar los dados o acercá una tarjeta")
 
-#Programa principal
+#Programa principal 
 while True:
-    #Java se conectó? (si ya había uno, se reemplaza por el nuevo)
+#Alguien se conectó? (se aceptan varios; si se llena, sale el más viejo)
     if servidor is not None:
         try:
             nuevo, addr = servidor.accept()
-            if cliente is not None:
+            nuevo.settimeout(2)
+            if len(clientes) >= MAX_CLIENTES:
+                viejo = clientes.pop(0)
                 try:
-                    cliente.close()
+                    viejo.close()
                 except OSError:
                     pass
-            cliente = nuevo
-            cliente.settimeout(2)
+            clientes.append(nuevo)
             print("Java conectado desde:", addr)
-            enviar("HOLA,PICO")
+            try:
+                nuevo.send(b"HOLA,PICO\n")
+            except OSError:
+                pass
         except OSError:
             pass    # nadie intentó conectarse
 
@@ -171,7 +174,7 @@ while True:
             t_ini = ticks_ms()
             t_cambio = 0
 
-    # 3)Animación y resultado (no bloquea: el lector sigue funcionando)
+    #Animación y resultado (no bloquea: el lector sigue funcionando)
     if animando:
         ahora = ticks_ms()
         if ticks_diff(ahora, t_ini) >= 1500:
@@ -186,7 +189,7 @@ while True:
             valores[1] = random.randint(1, 6)
             t_cambio = ahora
 
-    # 4) Lector RFID
+    #Lector RFID
     (estado, tipo) = rfid.request(rfid.REQIDL)
     if estado == rfid.OK:
         (estado2, uid) = rfid.SelectTagSN()
