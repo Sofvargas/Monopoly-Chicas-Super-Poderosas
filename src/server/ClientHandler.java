@@ -70,13 +70,20 @@ public class ClientHandler implements Runnable {
                 break;
             case "COMPRAR_PROPIEDAD":
                 // Validar fondos y estado del banco
-                if (parts.length >= 3) {
+                if (parts.length >= 2) {
                     String playerId = parts[1];
-                    String propertyId = parts[2];
-                    String result = bank.processPurchase(playerId, propertyId);
-                    sendMessage(result);
+                    String PurchaseResult = bank.buyProperty(playerId);
+                    sendMessage(PurchaseResult);
+                    if (PurchaseResult.startsWith("SUCCESS")) {
+                        BankServer.broadcastMessage("UPDATE_BOARD," + playerId + "_bought_property");
+                        // Notify the player of the error
+                        sendMessage(PurchaseResult);
+                    } else {
+                        // Notify everyone else on the network that the property was purchased
+                        BankServer.broadcastMessage("UPDATE_PROPERTY_PURCHASED," + playerId);
+                    }
                 } else {
-                    sendMessage("ERROR,INVALID_COMMAND_FORMAT");
+                    sendMessage("ERROR,MISSING_PLAYER_ID");
                 }
                 sendMessage("SUCCESS,PROPERTY_PURCHASED");
                 break;
@@ -87,7 +94,33 @@ public class ClientHandler implements Runnable {
             default:
                 sendMessage("ERROR,UNKNOWN_COMMAND");
                 break;
-        }
+        
+        case "SACAR_CARTA":
+                if (parts.length >= 2) {
+                    String playerId = parts[1];
+                    String cardResult = bank.drawEventCard(playerId);
+                    sendMessage(cardResult);
+                    
+                    if (cardResult.startsWith("SUCCESS")) {
+                        BankServer.broadcastMessage("UPDATE_BOARD," + playerId + "_drew_a_card");
+                    }
+                } else {
+                    sendMessage("ERROR,MISSING_PLAYER_ID");
+                }
+                break;
+                case "PAGAR_ALQUILER":
+                if (parts.length >= 2) {
+                    String playerId = parts[1];
+                    String rentResult = bank.payRent(playerId);
+                    sendMessage(rentResult);
+                    
+                    if (rentResult.startsWith("SUCCESS,RENT_PAID")) {
+                        BankServer.broadcastMessage("UPDATE_BOARD," + playerId + "_paid_rent");
+                    }
+                } else {
+                    sendMessage("ERROR,MISSING_PLAYER_ID");
+                }
+                break;}
     }
 
     public void sendMessage(String message) {
