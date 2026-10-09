@@ -1,27 +1,33 @@
 package monopoly_proyect;
 
 import javafx.application.Application;
-import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        Label etiqueta = new Label("Hola, JavaFX");
-        Button boton = new Button("Presióname");
-        boton.setOnAction(e -> etiqueta.setText("¡Funciona!"));
+        PantallaInicio inicio = new PantallaInicio(datos -> mostrarJuego(stage, datos));
 
-        VBox raiz = new VBox(10, etiqueta, boton);
-        raiz.setAlignment(Pos.CENTER);
+        Scene scene = new Scene(inicio.getRoot(), 560, 620);
+        scene.getStylesheets().add(getClass().getResource("/estilos.css").toExternalForm());
 
-        stage.setScene(new Scene(raiz, 300, 200));
-        stage.setTitle("Mi primera app");
+        stage.setScene(scene);
+        stage.setTitle("Monopoly - Chicas Superpoderosas");
         stage.show();
+    }
+
+    private void mostrarJuego(Stage stage, PantallaInicio.DatosConexion datos) {
+        System.out.println("Jugador: " + datos.nombre() + " -> "
+                + datos.ip() + ":" + datos.puerto()
+                + (datos.organizador() ? " (organizador)" : ""));
+
+        Interfaz interfaz = new Interfaz();
+        stage.getScene().setRoot(interfaz.getRoot());
+        stage.setWidth(1000);
+        stage.setHeight(800);
+        stage.centerOnScreen();
     }
 
     public static void main(String[] args) {

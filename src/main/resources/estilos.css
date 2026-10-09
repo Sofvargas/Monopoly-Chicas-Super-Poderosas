@@ -1,0 +1,74 @@
+.fondo {
+    -fx-background-color: linear-gradient(to bottom right, #ffe0f0, #d6f1ff);
+}
+
+.tablero {
+    -fx-padding: 20;
+}
+
+.casilla {
+    -fx-border-color: #212121;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.grupo-rosa  { -fx-background-color: #ff9ec7; }
+.grupo-azul  { -fx-background-color: #8fd8ff; }
+.grupo-verde { -fx-background-color: #a8e6a1; }
+.casilla-inicio { -fx-background-color: #212121; }
+
+.texto-casilla {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #212121;
+    -fx-text-alignment: center;
+}
+
+.casilla-inicio .texto-casilla {
+    -fx-text-fill: white;
+}
+
+.centro-tablero {
+    -fx-background-color: white;
+    -fx-border-color: #212121;
+    -fx-border-width: 3;
+}
+
+.centro-tablero .label {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #e91e8c;
+}
+
+.tarjeta {
+    -fx-background-color: white;
+    -fx-background-radius: 16;
+    -fx-border-color: #212121;
+    -fx-border-width: 3;
+    -fx-border-radius: 16;
+    -fx-padding: 30;
+}
+
+.titulo {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #e91e8c;
+}
+
+.mensaje-error {
+    -fx-text-fill: #d32f2f;
+}
+
+.boton-principal {
+    -fx-background-color: #ff69b4;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 15px;
+    -fx-background-radius: 10;
+    -fx-cursor: hand;
+}
+
+.boton-principal:hover {
+    -fx-background-color: #ff4fa3;
+}
