@@ -181,6 +181,54 @@ public synchronized String rollDiceAndMove(String playerId) {
     return String.format("SUCCESS,ROLLED:%d,LANDED_ON:%s,SQUARE_ID:%s", 
                          totalMove, landedSquare.getName(), landedSquare.getId());
 }
+public synchronized String handleBankruptcy(Player bankruptPlayer, String creditorId, double debtAmount, String reason) {
+    // 1. Liberar todas las propiedades del jugador que quiebra
+    // Como SinglyLinkedList probablemente no tiene clear(), recorremos y liberamos nodo por nodo:
+    structures.node<models.Property> propNode = bankruptPlayer.getOwnedProperties().getHead();
+    while (propNode != null) {
+        models.Property prop = propNode.getData();
+        prop.setOwner(null); // La propiedad vuelve a estar libre en el tablero
+        propNode = propNode.getNext();
+    }
+    
+    // Si tu lista de propiedades tiene un método para vaciarla, úsalo. 
+    // Si no, puedes reiniciar la lista asignando una nueva vacía (si tienes el setter):
+    // bankruptPlayer.setOwnedProperties(new structures.SinglyLinkedList<>());
+
+    // 2. Registrar la transacción de bancarrota
+    Transaction tx = new Transaction(
+        "TX" + transactionCounter++,
+        1, // Número de turno actual
+        "BANKRUPTCY",
+        bankruptPlayer.getId(),
+        creditorId,
+        bankruptPlayer.getBalance(),
+        "Bankruptcy declared due to: " + reason
+    );
+    transactionHistory.addTransaction(tx);
+
+    // 3. Eliminar al jugador de la CircularQueue sin necesidad de un método removePlayer() interno.
+    // Reconstruimos la cola de turnos metiendo a todos MENOS al que quebró:
+    structures.CircularQueue<Player> newQueue = new structures.CircularQueue<>();
+    
+    // Recorremos la cola actual usando los turnos
+    Player initialPlayer = turnsQueue.getCurrentTurn();
+    if (initialPlayer != null) {
+        Player current = initialPlayer;
+        do {
+            if (!current.getId().equals(bankruptPlayer.getId())) {
+                newQueue.addPlayer(current); // O el método que uses para encolar en tu CircularQueue
+            }
+            turnsQueue.advanceTurn();
+            current = turnsQueue.getCurrentTurn();
+        } while (current != initialPlayer);
+    }
+    
+    // Reemplazamos la cola vieja por la nueva sin el jugador eliminado
+    this.turnsQueue = newQueue;
+
+    return String.format("BANKRUPTCY,PLAYER_ELIMINATED:%s,REASON:%s", bankruptPlayer.getId(), reason);
+}
 // Agrega este método dentro de tu clase Bank
 public synchronized String buyProperty(String playerId) {
     Player current = turnsQueue.getCurrentTurn();
@@ -272,7 +320,7 @@ public synchronized String payRent(String playerId) {
 
     // 4. Validar fondos (La regla de eliminación si no puede pagar se maneja aquí después)
     if (current.getBalance() < rent) {
-        return "ERROR,INSUFFICIENT_FUNDS_FOR_RENT"; 
+        return handleBankruptcy(current, owner.getId(), rent, "Rent payment to " + owner.getName()); 
     }
 
     // 5. Ejecutar la transferencia entre jugadores
@@ -331,6 +379,31 @@ public synchronized String rollPhysicalDiceAndMove(String playerId, int dice1, i
 
     return String.format("SUCCESS,PHYSICAL_ROLL:%d,LANDED_ON:%s,SQUARE_ID:%s", 
                          totalMove, landedSquare.getName(), landedSquare.getId());
+}
+public synchronized String checkGameWinner() {
+    Player initialPlayer = turnsQueue.getCurrentTurn();
+    
+    // Si no hay jugadores en la cola, nadie gana
+    if (initialPlayer == null) {
+        return "GAME_OVER,NO_PLAYERS_LEFT";
+    }
+
+    int activeCount = 0;
+    Player current = initialPlayer;
+    
+    // Contamos cuántos jugadores activos hay dando una vuelta completa a la cola
+    do {
+        activeCount++;
+        turnsQueue.advanceTurn();
+        current = turnsQueue.getCurrentTurn();
+    } while (current != initialPlayer && current != null);
+
+    // Si solo queda 1 jugador activo, él es el ganador indiscutible
+    if (activeCount == 1) {
+        return "GAME_OVER,WINNER:" + initialPlayer.getId();
+    }
+
+    return "GAME_CONTINUES";
 }
 public synchronized String exportTransactions() {
     // Formato mínimo obligatorio: TXT
