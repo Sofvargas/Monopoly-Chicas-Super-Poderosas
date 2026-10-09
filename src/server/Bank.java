@@ -159,6 +159,14 @@ public synchronized String rollDiceAndMove(String playerId) {
     // Get current position index, calculate new one
     int oldIndex = current.getCurrentPositionIndex();
     int newIndex = (oldIndex + totalMove) % board.getSize();
+    if (newIndex < oldIndex) {
+        double goBonus = 200.0;
+        current.setBalance(current.getBalance() + goBonus);
+        Transaction tx = new Transaction(
+            "TX" + transactionCounter++, 1, "GO_BONUS", "BANK", playerId, goBonus, "Passed GO"
+        );
+        transactionHistory.addTransaction(tx);
+    }
     current.setCurrentPositionIndex(newIndex);
 
     // Traverse the nodes to find the landed square
@@ -284,5 +292,30 @@ public synchronized String payRent(String playerId) {
     transactionHistory.addTransaction(tx);
 
     return String.format("SUCCESS,RENT_PAID:%.2f,TO:%s,NEW_BALANCE:%.2f", rent, owner.getName(), current.getBalance());
+}
+public synchronized String exportTransactions() {
+    // Formato mínimo obligatorio: TXT
+    String filename = "historial_transacciones.txt";
+    
+    try (java.io.FileWriter writer = new java.io.FileWriter(filename)) {
+        writer.write("ID\tTURN\tTYPE\tSOURCE\tDESTINATION\tAMOUNT\tDESCRIPTION\n");
+        writer.write("----------------------------------------------------------------------\n");
+        
+        // Usamos tu lista doblemente enlazada para recorrer desde la más antigua[cite: 5]
+        structures.DoubleNode<models.Transaction> temp = transactionHistory.getOldest();
+        
+        while (temp != null) {
+            models.Transaction tx = temp.getData();
+            writer.write(String.format("%s\t%d\t%s\t%s\t%s\t%.2f\t%s\n",
+                tx.getId(), tx.getTurnNumber(), tx.getType(), 
+                tx.getSourcePlayerId(), tx.getDestinationPlayerId(), 
+                tx.getAmount(), tx.getDescription()
+            ));
+            temp = temp.getNext();
+        }
+        return "SUCCESS,TRANSACTIONS_EXPORTED";
+    } catch (java.io.IOException e) {
+        return "ERROR,EXPORT_FAILED";
+    }
 }
 }

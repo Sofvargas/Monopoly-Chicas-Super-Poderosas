@@ -35,5 +35,18 @@ public class Player {
     public void addProperty(Property property) {
         this.ownedProperties.add(property);
     }
+    public double calculateNetWorth() {
+        double netWorth = this.balance;
+        
+        // Recorremos tu lista simple de propiedades[cite: 1]
+        structures.node<models.Property> temp = this.ownedProperties.getHead();
+        while (temp != null) {
+            netWorth += temp.getData().getPurchasePrice();
+            temp = temp.getNext();
+        }
+        
+        return netWorth;
+    }
 }
+
 
