@@ -12,14 +12,19 @@ public class BankServer {
     private static List<ClientHandler> connectedClients = new ArrayList<>();
 
     public static void main(String[] args) {
-        System.out.println("Starting Bank Server on port " + PORT + "...");
+        System.out.println("Starting Bank Server on port " + PORT + "..."); // Instancia del banco que manejará la lógica del juego
+        Bank mainBank = new Bank(); // Instancia del banco que manejará la lógica del juego
+        String raspberryIp = "192.168.1.50"; // Cambiar IP por la que imprima la Pico
+        int raspberryPort = 8080;
         
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+        HardwareListener hwListener = new HardwareListener(raspberryIp, raspberryPort, mainBank);
+        new Thread(hwListener).start();
+        
+        try (java.net.ServerSocket serverSocket = new java.net.ServerSocket(PORT)) {
             System.out.println("Bank is waiting for players to connect...");
-            
-            Bank mainBank = new Bank(); // Instancia del banco que manejará la lógica del juego
+
             while (true) {
-                Socket clientSocket = serverSocket.accept();
+                java.net.Socket clientSocket = serverSocket.accept();
                 System.out.println("New player connected: " + clientSocket.getInetAddress().getHostAddress());
                 
                 // Creamos un nuevo hilo para cada jugadora que se conecta

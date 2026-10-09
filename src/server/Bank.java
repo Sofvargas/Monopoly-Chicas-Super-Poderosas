@@ -293,6 +293,45 @@ public synchronized String payRent(String playerId) {
 
     return String.format("SUCCESS,RENT_PAID:%.2f,TO:%s,NEW_BALANCE:%.2f", rent, owner.getName(), current.getBalance());
 }
+// 1. Necesitas este "getter" para que el HardwareListener sepa a quién mover
+public Player getCurrentTurnPlayer() {
+    return turnsQueue.getCurrentTurn();
+}
+
+// 2. Este método es idéntico a rollDiceAndMove, pero recibe los dados físicos por parámetro
+public synchronized String rollPhysicalDiceAndMove(String playerId, int dice1, int dice2) {
+    Player current = turnsQueue.getCurrentTurn();
+    
+    if (current == null || !current.getId().equals(playerId)) {
+        return "ERROR,NOT_YOUR_TURN";
+    }
+
+    int totalMove = dice1 + dice2;
+
+    int oldIndex = current.getCurrentPositionIndex();
+    int newIndex = (oldIndex + totalMove) % board.getSize();
+    
+    // Regla de pasar por GO (Inicio)
+    if (newIndex < oldIndex) {
+        double goBonus = 200.0;
+        current.setBalance(current.getBalance() + goBonus);
+        transactionHistory.addTransaction(new models.Transaction(
+            "TX" + transactionCounter++, 1, "GO_BONUS", "BANK", playerId, goBonus, "Passed GO"
+        ));
+    }
+    
+    current.setCurrentPositionIndex(newIndex);
+
+    structures.DoubleNode<models.Square> tempNode = board.getHead();
+    for (int i = 0; i < newIndex; i++) {
+        tempNode = tempNode.getNext();
+    }
+    
+    models.Square landedSquare = tempNode.getData();
+
+    return String.format("SUCCESS,PHYSICAL_ROLL:%d,LANDED_ON:%s,SQUARE_ID:%s", 
+                         totalMove, landedSquare.getName(), landedSquare.getId());
+}
 public synchronized String exportTransactions() {
     // Formato mínimo obligatorio: TXT
     String filename = "historial_transacciones.txt";
