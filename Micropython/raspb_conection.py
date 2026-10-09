@@ -85,7 +85,7 @@ def Iniciar_server():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        s.bind(("10.75.198.178", PORT))     # escucha en la IP que le dé el router
+        s.bind(("0.0.0.0", PORT))     # escucha en la IP que le dé el router
         s.listen(1)
         s.setblocking(False)          # accept() no se queda esperando
         print("Servidor TCP escuchando en puerto", PORT)

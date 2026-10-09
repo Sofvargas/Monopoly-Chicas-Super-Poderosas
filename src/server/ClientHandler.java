@@ -108,19 +108,23 @@ public class ClientHandler implements Runnable {
                     sendMessage("ERROR,MISSING_PLAYER_ID");
                 }
                 break;
-                case "PAGAR_ALQUILER":
-                if (parts.length >= 2) {
-                    String playerId = parts[1];
-                    String rentResult = bank.payRent(playerId);
-                    sendMessage(rentResult);
+        case "PAGAR_ALQUILER":
+            if (parts.length >= 2) {
+                String playerId = parts[1];
+                String rentResult = bank.payRent(playerId);
+                sendMessage(rentResult);
                     
-                    if (rentResult.startsWith("SUCCESS,RENT_PAID")) {
-                        BankServer.broadcastMessage("UPDATE_BOARD," + playerId + "_paid_rent");
+                if (rentResult.startsWith("SUCCESS,RENT_PAID")) {
+                    BankServer.broadcastMessage("UPDATE_BOARD," + playerId + "_paid_rent");
                     }
                 } else {
                     sendMessage("ERROR,MISSING_PLAYER_ID");
                 }
-                break;}
+                break;
+        case "EXPORTAR_HISTORIAL":
+                    String exportResult = bank.exportTransactions();
+                    sendMessage(exportResult);
+                    break; }   
     }
 
     public void sendMessage(String message) {
