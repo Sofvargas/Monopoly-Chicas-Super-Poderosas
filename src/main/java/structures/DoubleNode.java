@@ -1,5 +1,7 @@
 
 // Node classes for doubly Linked Lists and the board
+// Clase generica que representa un nodo doblemente enlazado
+// Este almacena el valor y referencias tanto al nodo siguiente como al anterior, permitiendo la navegacion bidireccional en las estructuras.
 package structures;
 
 public class DoubleNode<T> { // Doubly Linked List and Deques

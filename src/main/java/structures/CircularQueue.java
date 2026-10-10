@@ -1,4 +1,7 @@
 // Turns
+// Implementacion de una cola circular
+// utilizada para gestionar el ciclo de turnos entre los jugadores de forma equitativa
+// permitiendo rotar el turno actual de manera indefinida mientras permanezcan activos en la partida
 package structures;
 
 public class CircularQueue<T> {

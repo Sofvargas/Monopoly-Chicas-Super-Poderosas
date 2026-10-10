@@ -1,4 +1,7 @@
 // Transaction History
+// Implementacion de una lista doblemente enlazada generica
+// facilita el recorrido bidireccional y la manipulacion eficiente de nodos para el manejo de historiales y registros en el banco del monopoly.
+
 package structures;
 
 public class DoublyLinkedList<T> {

@@ -1,4 +1,7 @@
 // Board 
+// Implementacion de una lista circular doblemente enlazada. 
+// diseñada especificamente para modelar el tablero de monopoly de forma continua 
+// permitiendo avanzar y retroceder entre casillas de manera infinita sin desbordamientos
 package structures;
 
 public class CircularDoublyLinkedList<T> {
