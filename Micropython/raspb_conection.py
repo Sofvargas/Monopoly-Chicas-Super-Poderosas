@@ -202,5 +202,4 @@ while True:
                 enviar("TARJETA," + uid_str)
             ultimo_uid = uid_str
             t_uid = ahora
-
     sleep_ms(20)
