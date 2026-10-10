@@ -72,3 +72,7 @@
 .boton-principal:hover {
     -fx-background-color: #ff4fa3;
 }
+
+.titulo        { -fx-font-size: 2em; }
+.texto-casilla { -fx-font-size: 0.8em; }
+.boton-principal { -fx-font-size: 1em; }

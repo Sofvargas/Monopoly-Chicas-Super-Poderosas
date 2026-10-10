@@ -1,15 +1,18 @@
 package monopoly_proyect;
 
 import java.util.function.Function;
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.TextAlignment;
 
 public class PantallaInicio {
 
@@ -33,9 +36,18 @@ public class PantallaInicio {
      * o un texto con el problema (por ejemplo "no se pudo conectar") para mostrarlo aqui.
      */
     public PantallaInicio(Function<DatosConexion, String> alConectar) {
+        // El titulo se parte en varias lineas si la ventana es angosta y su tamano
+        // sale del CSS (.titulo { -fx-font-size: 2em; }), que App escala con la ventana.
         Label titulo = new Label("CHICAS SUPERPODEROSAS");
         titulo.getStyleClass().add("titulo");
+        titulo.setWrapText(true);
+        titulo.setTextAlignment(TextAlignment.CENTER);
+        titulo.setAlignment(Pos.CENTER);
+        titulo.setMaxWidth(Double.MAX_VALUE);
+
         Label subtitulo = new Label("Monopoly");
+        subtitulo.setAlignment(Pos.CENTER);
+        subtitulo.setMaxWidth(Double.MAX_VALUE);
 
         campoNombre.setPromptText("Tu nombre");
         campoNombre2.setPromptText("Opcional");
@@ -57,24 +69,41 @@ public class PantallaInicio {
         mensajeError.getStyleClass().add("mensaje-error");
         mensajeError.setWrapText(true);
 
+        Label etiquetaPico = new Label("Hardware: IP de la Pico (solo organizador)");
+        etiquetaPico.setWrapText(true);
+        Label etiquetaSegundo = new Label("Segundo jugador en esta computadora");
+        etiquetaSegundo.setWrapText(true);
+
         VBox tarjeta = new VBox(10,
                 titulo, subtitulo,
                 new Label("Nombre del jugador"), campoNombre,
-                new Label("Segundo jugador en esta computadora"), campoNombre2,
+                etiquetaSegundo, campoNombre2,
                 new Label("IP del servidor"), campoIp,
                 new Label("Puerto"), campoPuerto,
                 chkOrganizador,
-                new Label("Hardware: IP de la Pico (solo organizador)"), campoIpPico,
+                etiquetaPico, campoIpPico,
                 new Label("Hardware: puerto de la Pico"), campoPuertoPico,
                 btnConectar,
                 mensajeError);
         tarjeta.getStyleClass().add("tarjeta");
         tarjeta.setAlignment(Pos.CENTER_LEFT);
-        tarjeta.setMaxWidth(380);
         tarjeta.setMaxHeight(Region.USE_PREF_SIZE);
+        // Ancho: 90% de la ventana, pero nunca mas de 420 px
+        tarjeta.maxWidthProperty().bind(Bindings.min(root.widthProperty().multiply(0.9), 420));
+
+        // Si la ventana es baja y el formulario no cabe, aparece una barra de desplazamiento
+        // en vez de cortar los campos. Si cabe, la tarjeta queda centrada.
+        StackPane contenedor = new StackPane(tarjeta);
+        contenedor.setPadding(new javafx.geometry.Insets(15));
+
+        ScrollPane scroll = new ScrollPane(contenedor);
+        scroll.setFitToWidth(true);
+        scroll.setFitToHeight(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.getStyleClass().add("scroll-inicio");
 
         root.getStyleClass().add("fondo");
-        root.getChildren().add(tarjeta);
+        root.getChildren().add(scroll);
     }
 
     public Parent getRoot() {
