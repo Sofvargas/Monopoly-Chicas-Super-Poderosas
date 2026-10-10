@@ -21,6 +21,8 @@ public class CircularQueue<T> {
         } else {
             rear.setNext(newNode);   // el ultimo apunta al nuevo
             newNode.setNext(front);  // el nuevo cierra el circulo apuntando al primero
+            rear.setNext(newNode);
+            rear.setNext(front);
             rear = newNode;
         }
     }
