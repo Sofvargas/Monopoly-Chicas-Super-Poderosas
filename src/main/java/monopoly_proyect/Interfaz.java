@@ -2,6 +2,8 @@ package monopoly_proyect;
 
 import java.io.InputStream;
 import java.util.function.Consumer;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.DoubleBinding;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
@@ -12,7 +14,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import models.Tablero;
@@ -21,7 +23,10 @@ public class Interfaz {
 
     private static final int TOTAL_CASILLAS = 24;
     private static final String[] NOMBRES = Tablero.NOMBRES; // mismo orden que el tablero del servidor
-    private static final int LADO = TOTAL_CASILLAS / 4; // 6 casillas por lado
+    private static final int LADO = TOTAL_CASILLAS / 4;      // 6 casillas por lado (el tablero es de 7x7)
+
+    private static final double ANCHO_PANEL = 280;           // panel derecho
+    private static final double MARGEN = 40;                 // margen alrededor del tablero
 
     private final BorderPane root = new BorderPane();
     private final GridPane tablero = new GridPane();
@@ -37,24 +42,31 @@ public class Interfaz {
     private String[] jugadoresLocales = new String[0];
     private String turnoActual = "";
 
+    // Tamano (en pixeles) de cada casilla; se recalcula solo al cambiar la ventana
+    private DoubleBinding tamanoCasilla;
+
     public Interfaz() {
         root.getStyleClass().add("fondo");
         tablero.getStyleClass().add("tablero");
         tablero.setAlignment(Pos.CENTER);
 
+        // IMPORTANTE: esto va ANTES de construirTablero(), que ya usa tamanoCasilla
+        tamanoCasilla = Bindings.createDoubleBinding(() -> {
+            double ancho = root.getWidth() - ANCHO_PANEL - MARGEN;
+            double alto = root.getHeight() - MARGEN;
+            return Math.max(50, Math.min(ancho, alto) / (LADO + 1)); // 7 casillas por lado
+        }, root.widthProperty(), root.heightProperty());
+
         construirTablero();
         root.setCenter(tablero);
+        BorderPane.setMargin(tablero, new Insets(10));
 
-        // Parte de arriba: de quien es el turno
+        // ----- Panel derecho: turno, botones y registro -----
         lblTurno.getStyleClass().add("titulo");
-        HBox barraSuperior = new HBox(lblTurno);
-        barraSuperior.setAlignment(Pos.CENTER);
-        barraSuperior.setPadding(new Insets(12, 0, 0, 0));
-        root.setTop(barraSuperior);
+        lblTurno.setWrapText(true);
 
-        // Parte de abajo: botones y registro de mensajes
         registro.setEditable(false);
-        registro.setPrefHeight(150);
+        registro.setWrapText(true);
 
         btnIniciar.getStyleClass().add("boton-principal");
         btnTerminar.getStyleClass().add("boton-principal");
@@ -66,15 +78,22 @@ public class Interfaz {
         });
         btnTerminar.setOnAction(e -> enviarComando.accept("TERMINAR_TURNO," + turnoActual));
 
+        // El "Dado de prueba" solo existe si NO hay hardware (ver usarHardware).
         btnDadoPrueba.setDisable(true);
         btnDadoPrueba.setOnAction(e -> enviarComando.accept("TIRAR_DADOS," + turnoActual));
 
-        // El "Dado de prueba" solo existe si NO hay hardware (ver usarHardware).
-        HBox botones = new HBox(10, btnIniciar, btnTerminar, btnDadoPrueba);
-        botones.setAlignment(Pos.CENTER);
-        VBox barraInferior = new VBox(8, botones, registro);
-        barraInferior.setPadding(new Insets(10));
-        root.setBottom(barraInferior);
+        // Que los botones ocupen todo el ancho del panel
+        btnIniciar.setMaxWidth(Double.MAX_VALUE);
+        btnTerminar.setMaxWidth(Double.MAX_VALUE);
+        btnDadoPrueba.setMaxWidth(Double.MAX_VALUE);
+
+        VBox panel = new VBox(10, lblTurno, btnIniciar, btnTerminar, btnDadoPrueba, registro);
+        panel.setPadding(new Insets(10));
+        panel.setPrefWidth(ANCHO_PANEL);
+        panel.setMinWidth(ANCHO_PANEL);
+        panel.setMaxWidth(ANCHO_PANEL);
+        VBox.setVgrow(registro, Priority.ALWAYS); // el registro ocupa todo el alto sobrante
+        root.setRight(panel);
     }
 
     public Parent getRoot() {
@@ -174,8 +193,8 @@ public class Interfaz {
         }
 
         ImageView vista = new ImageView(new Image(flujo));
-        vista.setFitWidth(420);
-        vista.setFitHeight(420);
+        vista.fitWidthProperty().bind(tamanoCasilla.multiply(LADO - 1).subtract(20));
+        vista.fitHeightProperty().bind(tamanoCasilla.multiply(LADO - 1).subtract(20));
         vista.setPreserveRatio(true);
         vista.setSmooth(true);
         centro.getChildren().add(vista);
@@ -188,7 +207,9 @@ public class Interfaz {
         etiqueta.getStyleClass().add("texto-casilla");
 
         StackPane celda = new StackPane(etiqueta);
-        celda.setPrefSize(90, 90);
+        celda.prefWidthProperty().bind(tamanoCasilla);
+        celda.prefHeightProperty().bind(tamanoCasilla);
+        celda.setMinSize(0, 0); // permite que la casilla se encoja con la ventana
         celda.getStyleClass().add("casilla");
         celda.getStyleClass().add(claseDeColor(indice));
         return celda;
