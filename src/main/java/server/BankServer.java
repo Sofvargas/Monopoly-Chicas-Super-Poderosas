@@ -121,18 +121,29 @@ public class BankServer {
     }
 
     /**
-     * Una tarjeta RFID fue leida por el hardware. Por ahora solo se avisa a todos.
-     * PENDIENTE: definir que significa (identificar al jugador, pagar, etc.).
+     * Una tarjeta RFID fue leida por el hardware. Si hay un cobro pendiente y es
+     * la tarjeta del jugador que debe pagar, se ejecuta; si no, solo se informa.
      */
     public static void hardwareCard(String uid) {
-        broadcast("TARJETA," + uid);
+        for (String line : session.cardTapped(uid)) {
+            broadcast(line);
+        }
+    }
+
+    /** Tarjeta simulada: lo usa ClientHandler cuando no hay hardware. */
+    static String cardSimulated(String player) {
+        String uid = session.cardOf(player);
+        if (uid == null) return "PARTIDA_NO_INICIADA";
+        hardwareCard(uid);
+        return GameSession.OK;
     }
 
     private static volatile HardwareLink hardwareLink;
 
     /**
      * Se conecta a la Pico (que es servidor TCP) y activa el modo hardware:
-     * desde ahora TIRAR_DADOS se rechaza y los dados solo llegan de la Pico.
+     * desde ahora TIRAR_DADOS y PASAR_TARJETA se rechazan; los dados y las
+     * tarjetas solo llegan de la Pico.
      */
     public static synchronized void startHardware(String host, int port) {
         if (hardwareLink != null) hardwareLink.stop();
@@ -160,11 +171,12 @@ public class BankServer {
 
     private static void announceRoll(String player, int d1, int d2) {
         broadcast("DADOS," + player + "," + d1 + "," + d2);
-        // Mueve la ficha por el tablero circular, cobra el salario y avisa a todos
+        // Mueve la ficha por el tablero circular, cobra el salario, deja pendiente
+        // la compra o el alquiler (se pagan con la tarjeta) y avisa a todos
         for (String line : session.applyRoll(d1, d2)) {
             broadcast(line);
         }
-        // PENDIENTE (Juego/Banco): comprar propiedad, cobrar alquiler, cartas de evento.
+        // PENDIENTE (Juego/Banco): cartas de evento y casillas especiales.
     }
 
     // ---------------------------------------------------------------- ayuda
