@@ -1,6 +1,9 @@
 package server;
 
 import java.util.concurrent.ThreadLocalRandom;
+import models.Cartas;
+import models.EventCard;
+import models.EventSquare;
 import models.Player;
 import models.Property;
 import models.SpecialSquare;
@@ -13,6 +16,7 @@ import structures.CircularDoublyLinkedList;
 import structures.CircularQueue;
 import structures.DoubleNode;
 import structures.DoublyLinkedList;
+import structures.ReusableQueue;
 import structures.SinglyLinkedList;
 import structures.node;
 
@@ -22,6 +26,7 @@ import structures.node;
  *  - CircularDoublyLinkedList<Square>      -> tablero
  *  - DoublyLinkedList<Transaction>         -> historial de transacciones
  *  - SinglyLinkedList<Tarjeta>             -> tarjetas RFID por repartir
+ *  - ReusableQueue<EventCard>              -> mazo de cartas sorpresa
  * (el arreglo 'players' solo sirve para buscar por nombre; no reemplaza a ninguna estructura).
  *
  * Todos los metodos son synchronized porque varios hilos (uno por computadora
@@ -51,6 +56,9 @@ public class GameSession {
     // Si la propiedad no tiene dueno es una COMPRA (opcional); si lo tiene es un ALQUILER (obligatorio).
     private Player deudor = null;
     private Property propiedadPendiente = null;
+
+    // Mazo de cartas sorpresa: la carta que se saca vuelve al final de la cola
+    private final ReusableQueue<EventCard> eventCards = Cartas.crear();
 
     // Avisos de turnos saltados por la carcel, pendientes de enviar (ver takeNotices)
     private final StringBuilder avisos = new StringBuilder();
@@ -210,13 +218,21 @@ public class GameSession {
      * Devuelve las lineas de protocolo que el servidor debe enviar a todos:
      *   POSICION,jugador,indice,nombreCasilla
      *   SALDO,jugador,saldo
-     * y, si cayo en una propiedad, las de la compra o el alquiler (ver resolverPropiedad).
+     * y las de lo que pase en la casilla: compra o alquiler, carcel o carta sorpresa.
      */
     public synchronized String[] applyRoll(int d1, int d2) {
-        Player p = turns.getCurrentTurn();
+        StringBuilder out = new StringBuilder();
+        mover(turns.getCurrentTurn(), d1 + d2, out);
+        return lineas(out);
+    }
+
+    /**
+     * Avanza la ficha de 'p' la cantidad de casillas indicada y resuelve la casilla
+     * donde cae. Lo usan los dados y las cartas de "Avanza N casillas".
+     */
+    private void mover(Player p, int total, StringBuilder out) {
         int size = board.getSize();
         int old = p.getCurrentPositionIndex();
-        int total = d1 + d2;
 
         // Recorre el tablero con la estructura del grupo
         DoubleNode<Square> from = board.movePositions(board.getHead(), old);
@@ -233,15 +249,45 @@ public class GameSession {
         Square square = dest.getData();
         square.executeAction(p);
 
-        StringBuilder out = new StringBuilder();
         linea(out, "POSICION," + p.getName() + "," + newIndex + "," + square.getName());
         linea(out, saldo(p));
         if (square instanceof Property) {
             resolverPropiedad(p, (Property) square, out);
         } else if (square instanceof SpecialSquare) {
             resolverCarcel(p, (SpecialSquare) square, out);
+        } else if (square instanceof EventSquare) {
+            resolverCarta(p, out);
         }
-        return lineas(out);
+    }
+
+    /**
+     * El jugador cayo en "Carta sorpresa" o "Sorpresa": saca la primera carta del
+     * mazo (que vuelve al final de la cola) y se aplica su efecto de inmediato.
+     * El banco paga y cobra directo, sin tarjeta. Si no le alcanza para pagar,
+     * el jugador sale del juego.
+     */
+    private void resolverCarta(Player p, StringBuilder out) {
+        EventCard carta = eventCards.drawAndReuse();
+        linea(out, "CARTA," + p.getName() + "," + carta.getDescription());
+        int valor = carta.getValue();
+        switch (carta.getEffectType()) {
+            case "RECEIVE_MONEY" -> {
+                p.setBalance(p.getBalance() + valor);
+                registrar("EVENT_GAIN", "BANK", p.getId(), valor, "Carta: " + carta.getDescription());
+                linea(out, saldo(p));
+            }
+            case "PAY_MONEY" -> {
+                if (p.getBalance() < valor) {
+                    eliminar(p, null, "No pudo pagar la carta: " + carta.getDescription(), out);
+                    return;
+                }
+                p.setBalance(p.getBalance() - valor);
+                registrar("EVENT_LOSS", p.getId(), "BANK", valor, "Carta: " + carta.getDescription());
+                linea(out, saldo(p));
+            }
+            case "MOVE_FORWARD" -> mover(p, valor, out);
+            default -> System.out.println("Carta con efecto desconocido: " + carta.getEffectType());
+        }
     }
 
     /**
@@ -291,7 +337,7 @@ public class GameSession {
                     + p.getName() + ": acerca tu tarjeta para comprarla o termina el turno");
         } else if (dueno != p) {
             if (p.getBalance() < prop.getRentPrice()) {
-                eliminar(p, dueno, prop, out);
+                eliminar(p, dueno, "No pudo pagar el alquiler de " + prop.getName(), out);
                 return;
             }
             deudor = p;
@@ -365,16 +411,17 @@ public class GameSession {
     }
 
     /**
-     * 'p' no puede pagar el alquiler: sale del juego. Lo que le queda de saldo
-     * pasa al dueno de la propiedad y sus propiedades vuelven a estar libres.
+     * 'p' no puede pagar: sale del juego. Lo que le queda de saldo pasa a quien
+     * le debia ('acreedor'; null = el banco) y sus propiedades vuelven a estar libres.
      * Si solo queda un jugador, gana; si no, el turno pasa al siguiente.
      */
-    private void eliminar(Player p, Player acreedor, Property prop, StringBuilder out) {
+    private void eliminar(Player p, Player acreedor, String motivo, StringBuilder out) {
         double resto = p.getBalance();
-        acreedor.setBalance(acreedor.getBalance() + resto);
+        if (acreedor != null) {
+            acreedor.setBalance(acreedor.getBalance() + resto);
+        }
         p.setBalance(0);
-        registrar("BANKRUPTCY", p.getId(), acreedor.getId(), resto,
-                "No pudo pagar el alquiler de " + prop.getName());
+        registrar("BANKRUPTCY", p.getId(), acreedor != null ? acreedor.getId() : "BANK", resto, motivo);
 
         SinglyLinkedList<Property> propiedades = p.getOwnedProperties();
         while (propiedades.getHead() != null) {
@@ -386,7 +433,9 @@ public class GameSession {
 
         linea(out, "ELIMINADO," + p.getName());
         linea(out, saldo(p));
-        linea(out, saldo(acreedor));
+        if (acreedor != null) {
+            linea(out, saldo(acreedor));
+        }
 
         Player ganador = unicoActivo();
         if (ganador != null) {
