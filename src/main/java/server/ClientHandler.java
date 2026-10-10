@@ -158,6 +158,10 @@ public class ClientHandler implements Runnable {
             send("ERROR," + result);
             return;
         }
+        // Avisos de jugadores en la carcel a los que se les salto el turno
+        for (String line : BankServer.session().takeNotices()) {
+            BankServer.broadcast(line);
+        }
         BankServer.broadcast("TURNO," + BankServer.session().currentPlayer());
     }
 

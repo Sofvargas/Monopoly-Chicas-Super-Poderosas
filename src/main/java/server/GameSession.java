@@ -3,6 +3,7 @@ package server;
 import java.util.concurrent.ThreadLocalRandom;
 import models.Player;
 import models.Property;
+import models.SpecialSquare;
 import models.Square;
 import models.Tablero;
 import models.Tarjeta;
@@ -50,6 +51,9 @@ public class GameSession {
     // Si la propiedad no tiene dueno es una COMPRA (opcional); si lo tiene es un ALQUILER (obligatorio).
     private Player deudor = null;
     private Property propiedadPendiente = null;
+
+    // Avisos de turnos saltados por la carcel, pendientes de enviar (ver takeNotices)
+    private final StringBuilder avisos = new StringBuilder();
 
     /** Registra un jugador. Solo se puede antes de que inicie la partida. */
     public synchronized String addPlayer(String name) {
@@ -169,15 +173,35 @@ public class GameSession {
         return OK;
     }
 
-    /** Pasa el turno al siguiente jugador que siga en el juego. */
+    /**
+     * Pasa el turno al siguiente jugador que siga en el juego. A quien esta en
+     * la carcel se le salta el turno y se le descuenta uno de los que debe perder.
+     */
     private void avanzarTurno() {
-        do {
+        while (true) {
             turns.advanceTurn();
-        } while (!turns.getCurrentTurn().isActive());
+            Player siguiente = turns.getCurrentTurn();
+            if (!siguiente.isActive()) continue;
+            if (siguiente.getTurnosEnCarcel() == 0) break;
+            siguiente.setTurnosEnCarcel(siguiente.getTurnosEnCarcel() - 1);
+            linea(avisos, "MENSAJE," + siguiente.getName() + " está en la cárcel y pierde este turno (le quedan "
+                    + siguiente.getTurnosEnCarcel() + " por perder)");
+        }
         turnNumber++;
         diceRolled = false;
         deudor = null;
         propiedadPendiente = null;
+    }
+
+    /**
+     * Avisos de turnos saltados por la carcel que se generaron al pasar el turno.
+     * El servidor los envia a todos ANTES del "TURNO,...". Se vacian al leerlos.
+     */
+    public synchronized String[] takeNotices() {
+        if (avisos.length() == 0) return new String[0];
+        String[] lines = lineas(avisos);
+        avisos.setLength(0);
+        return lines;
     }
 
     /**
@@ -214,8 +238,37 @@ public class GameSession {
         linea(out, saldo(p));
         if (square instanceof Property) {
             resolverPropiedad(p, (Property) square, out);
+        } else if (square instanceof SpecialSquare) {
+            resolverCarcel(p, (SpecialSquare) square, out);
         }
         return lineas(out);
+    }
+
+    /**
+     * El jugador cayo en "Cárcel" o en "Ir a la cárcel": pierde sus proximos
+     * turnos (Tablero.TURNOS_EN_CARCEL). Desde "Ir a la cárcel" ademas la ficha
+     * se mueve a la casilla de la carcel, sin pasar por Inicio.
+     * El turno se salta en avanzarTurno().
+     */
+    private void resolverCarcel(Player p, SpecialSquare square, StringBuilder out) {
+        String tipo = square.getSpecialActionType();
+        if (tipo.equals("IR_A_CARCEL")) {
+            DoubleNode<Square> nodo = board.getHead();
+            for (int i = 0; i < board.getSize(); i++) {
+                Square s = nodo.getData();
+                if (s instanceof SpecialSquare && ((SpecialSquare) s).getSpecialActionType().equals("CARCEL")) {
+                    p.setCurrentPositionIndex(i);
+                    linea(out, "POSICION," + p.getName() + "," + i + "," + s.getName());
+                    break;
+                }
+                nodo = nodo.getNext();
+            }
+        } else if (!tipo.equals("CARCEL")) {
+            return;
+        }
+        p.setTurnosEnCarcel(Tablero.TURNOS_EN_CARCEL);
+        linea(out, "MENSAJE," + p.getName() + " está en la cárcel: pierde sus próximos "
+                + Tablero.TURNOS_EN_CARCEL + " turnos");
     }
 
     /**
@@ -343,6 +396,8 @@ public class GameSession {
             linea(out, "GANADOR," + ganador.getName());
         } else {
             avanzarTurno();
+            out.append(avisos); // turnos saltados por la carcel, antes del TURNO
+            avisos.setLength(0);
             linea(out, "TURNO," + turns.getCurrentTurn().getName());
         }
     }
