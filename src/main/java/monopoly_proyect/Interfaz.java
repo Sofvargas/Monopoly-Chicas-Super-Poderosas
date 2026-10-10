@@ -36,6 +36,7 @@ public class Interfaz {
     private final Button btnIniciar = new Button("Iniciar partida");
     private final Button btnTerminar = new Button("Terminar turno");
     private final Button btnDadoPrueba = new Button("Dado de prueba");
+    private final Button btnTarjetaPrueba = new Button("Tarjeta de prueba");
     private final TextArea registro = new TextArea();
 
     private Consumer<String> enviarComando = comando -> { };
@@ -82,12 +83,18 @@ public class Interfaz {
         btnDadoPrueba.setDisable(true);
         btnDadoPrueba.setOnAction(e -> enviarComando.accept("TIRAR_DADOS," + turnoActual));
 
+        // "Tarjeta de prueba": simula que el jugador en turno acerco su tarjeta al lector.
+        // Igual que el dado, solo existe si NO hay hardware.
+        btnTarjetaPrueba.setDisable(true);
+        btnTarjetaPrueba.setOnAction(e -> enviarComando.accept("PASAR_TARJETA," + turnoActual));
+
         // Que los botones ocupen todo el ancho del panel
         btnIniciar.setMaxWidth(Double.MAX_VALUE);
         btnTerminar.setMaxWidth(Double.MAX_VALUE);
         btnDadoPrueba.setMaxWidth(Double.MAX_VALUE);
+        btnTarjetaPrueba.setMaxWidth(Double.MAX_VALUE);
 
-        VBox panel = new VBox(10, lblTurno, btnIniciar, btnTerminar, btnDadoPrueba, registro);
+        VBox panel = new VBox(10, lblTurno, btnIniciar, btnTerminar, btnDadoPrueba, btnTarjetaPrueba, registro);
         panel.setPadding(new Insets(10));
         panel.setPrefWidth(ANCHO_PANEL);
         panel.setMinWidth(ANCHO_PANEL);
@@ -113,12 +120,14 @@ public class Interfaz {
     }
 
     /**
-     * Si hay hardware conectado, la ventana no debe tener ningun control de dados:
-     * se quita el boton de prueba.
+     * Si hay hardware conectado, la ventana no debe tener ningun control de dados
+     * ni de tarjetas: se quitan los botones de prueba.
      */
     public void usarHardware(boolean hayHardware) {
         btnDadoPrueba.setVisible(!hayHardware);
         btnDadoPrueba.setManaged(!hayHardware);
+        btnTarjetaPrueba.setVisible(!hayHardware);
+        btnTarjetaPrueba.setManaged(!hayHardware);
     }
 
     /** Interpreta cada mensaje del servidor. Siempre se llama desde el hilo de JavaFX. */
@@ -136,7 +145,18 @@ public class Interfaz {
                 boolean leToca = esLocal(turnoActual); // true solo si le toca a alguien de ESTA computadora
                 btnTerminar.setDisable(!leToca);
                 btnDadoPrueba.setDisable(!leToca);
+                btnTarjetaPrueba.setDisable(!leToca);
                 mostrarMensaje("Turno de " + turnoActual);
+            }
+            case "TARJETA_ASIGNADA" -> mostrarMensaje(p[1] + " recibió la tarjeta " + p[2]);
+            case "PROPIEDAD" -> mostrarMensaje(p[1] + " compró " + p[3]);
+            case "ELIMINADO" -> mostrarMensaje(p[1] + " no pudo pagar y quedó fuera del juego. Sus propiedades quedan libres.");
+            case "GANADOR" -> {
+                lblTurno.setText("¡Ganó " + p[1] + "!");
+                btnTerminar.setDisable(true);
+                btnDadoPrueba.setDisable(true);
+                btnTarjetaPrueba.setDisable(true);
+                mostrarMensaje("Fin de la partida. ¡Ganó " + p[1] + "!");
             }
             case "DADOS" -> mostrarDados(p, linea);
             case "POSICION" -> mostrarMensaje(p[1] + " avanzó a " + p[3] + " (casilla " + p[2] + ")");

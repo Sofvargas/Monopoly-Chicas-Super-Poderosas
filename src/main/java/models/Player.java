@@ -8,6 +8,7 @@ public class Player {
     private int currentPositionIndex;
     private boolean isActive;
     private SinglyLinkedList<Property> ownedProperties; // Tu estructura personalizada
+    private Tarjeta card; // tarjeta RFID asignada al iniciar la partida (null antes de eso)
 
     public Player(String id, String name, double startingBalance) {
         this.id = id;
@@ -31,6 +32,9 @@ public class Player {
     public void setActive(boolean active) { isActive = active; }
     
     public SinglyLinkedList<Property> getOwnedProperties() { return ownedProperties; }
+
+    public Tarjeta getCard() { return card; }
+    public void setCard(Tarjeta card) { this.card = card; }
 
     public void addProperty(Property property) {
         this.ownedProperties.add(property);

@@ -20,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *     CONECTAR,jugador          registra un jugador en esta computadora
  *     INICIAR,jugador           inicia la partida (minimo 2 jugadores)
  *     TIRAR_DADOS,jugador       lanzamiento simulado (solo si no hay hardware)
+ *     PASAR_TARJETA,jugador     tarjeta simulada del jugador (solo si no hay hardware)
  *     TERMINAR_TURNO,jugador    pasa el turno
  *     CONSULTAR_ESTADO          pide la lista de jugadores y el turno
  *   Servidor -> Cliente
@@ -27,9 +28,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *     ERROR,codigo              rechazo (solo a quien la pidio)
  *     JUGADORES,a;b;c           (a todos) lista de jugadores
  *     INICIADA,a;b;c            (a todos) la partida comenzo
+ *     TARJETA_ASIGNADA,jugador,alias   (a todos) tarjeta que le toco a cada jugador
  *     TURNO,jugador             (a todos) de quien es el turno
  *     DADOS,jugador,d1,d2       (a todos) resultado de los dados
- *     MENSAJE,texto             (a todos) aviso informativo
+ *     POSICION,jugador,indice,casilla  (a todos) a donde llego la ficha
+ *     SALDO,jugador,saldo       (a todos) saldo nuevo de un jugador
+ *     PROPIEDAD,jugador,indice,casilla (a todos) el jugador compro esa casilla
+ *     ELIMINADO,jugador         (a todos) no pudo pagar un alquiler y sale del juego
+ *     GANADOR,jugador           (a todos) solo queda un jugador: fin de la partida
+ *     MENSAJE,texto             (a todos) aviso informativo (el texto no lleva comas)
  */
 public class ClientHandler implements Runnable {
 
@@ -82,6 +89,7 @@ public class ClientHandler implements Runnable {
             case "CONECTAR" -> handleConnect(player);
             case "INICIAR" -> handleStart(player);
             case "TIRAR_DADOS" -> handleRoll(player);
+            case "PASAR_TARJETA" -> handleCard(player);
             case "TERMINAR_TURNO" -> handleEndTurn(player);
             case "CONSULTAR_ESTADO" -> sendState();
             default -> send("ERROR,COMANDO_DESCONOCIDO");
@@ -113,6 +121,9 @@ public class ClientHandler implements Runnable {
             return;
         }
         BankServer.broadcast("INICIADA," + BankServer.session().playersAsText());
+        for (String line : BankServer.session().cardsAsLines()) {
+            BankServer.broadcast(line);
+        }
         BankServer.broadcast("TURNO," + BankServer.session().currentPlayer());
     }
 
@@ -123,6 +134,18 @@ public class ClientHandler implements Runnable {
             return;
         }
         String result = BankServer.rollSimulated(player);
+        if (!result.equals(GameSession.OK)) {
+            send("ERROR," + result);
+        }
+    }
+
+    private void handleCard(String player) {
+        if (!owns(player)) return;
+        if (BankServer.usesHardwareDice()) {
+            send("ERROR,USA_LA_TARJETA_FISICA");
+            return;
+        }
+        String result = BankServer.cardSimulated(player);
         if (!result.equals(GameSession.OK)) {
             send("ERROR," + result);
         }
