@@ -19,10 +19,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *   Cliente -> Servidor
  *     CONECTAR,jugador          registra un jugador en esta computadora
  *     INICIAR,jugador           inicia la partida (minimo 2 jugadores)
- *     TIRAR_DADOS,jugador       lanzamiento simulado (solo si no hay hardware)
- *     PASAR_TARJETA,jugador     tarjeta simulada del jugador (solo si no hay hardware)
  *     TERMINAR_TURNO,jugador    pasa el turno
+ *     TERMINAR_PARTIDA,jugador  termina la partida para todos y pide el historial
  *     CONSULTAR_ESTADO          pide la lista de jugadores y el turno
+ *   (los dados y las tarjetas no son comandos: solo llegan del hardware)
  *   Servidor -> Cliente
  *     OK,CONECTADO,jugador      confirmacion (solo a quien la pidio)
  *     ERROR,codigo              rechazo (solo a quien la pidio)
@@ -37,6 +37,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *     CARTA,jugador,descripcion (a todos) carta sorpresa que saco el jugador
  *     ELIMINADO,jugador         (a todos) no pudo pagar un alquiler y sale del juego
  *     GANADOR,jugador           (a todos) solo queda un jugador: fin de la partida
+ *     HISTORIAL_INICIO,jugador  (a todos) 'jugador' termino la partida; siguen las transacciones
+ *     TRANSACCION,id,turno,tipo,origen,destino,monto,descripcion   (a todos) una por linea
+ *     HISTORIAL_FIN             (a todos) fin del historial: la ventana ya puede mostrarlo
  *     MENSAJE,texto             (a todos) aviso informativo (el texto no lleva comas)
  */
 public class ClientHandler implements Runnable {
@@ -89,9 +92,8 @@ public class ClientHandler implements Runnable {
         switch (action) {
             case "CONECTAR" -> handleConnect(player);
             case "INICIAR" -> handleStart(player);
-            case "TIRAR_DADOS" -> handleRoll(player);
-            case "PASAR_TARJETA" -> handleCard(player);
             case "TERMINAR_TURNO" -> handleEndTurn(player);
+            case "TERMINAR_PARTIDA" -> handleEndGame(player);
             case "CONSULTAR_ESTADO" -> sendState();
             default -> send("ERROR,COMANDO_DESCONOCIDO");
         }
@@ -128,28 +130,19 @@ public class ClientHandler implements Runnable {
         BankServer.broadcast("TURNO," + BankServer.session().currentPlayer());
     }
 
-    private void handleRoll(String player) {
+    /** Termina la partida para todos y les envia el historial de transacciones. */
+    private void handleEndGame(String player) {
         if (!owns(player)) return;
-        if (BankServer.usesHardwareDice()) {
-            send("ERROR,USA_EL_BOTON_FISICO");
-            return;
-        }
-        String result = BankServer.rollSimulated(player);
+        String result = BankServer.session().endGame();
         if (!result.equals(GameSession.OK)) {
             send("ERROR," + result);
-        }
-    }
-
-    private void handleCard(String player) {
-        if (!owns(player)) return;
-        if (BankServer.usesHardwareDice()) {
-            send("ERROR,USA_LA_TARJETA_FISICA");
             return;
         }
-        String result = BankServer.cardSimulated(player);
-        if (!result.equals(GameSession.OK)) {
-            send("ERROR," + result);
+        BankServer.broadcast("HISTORIAL_INICIO," + player);
+        for (String line : BankServer.session().historyAsLines()) {
+            BankServer.broadcast(line);
         }
+        BankServer.broadcast("HISTORIAL_FIN");
     }
 
     private void handleEndTurn(String player) {

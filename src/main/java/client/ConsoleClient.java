@@ -12,8 +12,8 @@ import java.util.Scanner;
  * Ejemplo de sesion:
  *   CONECTAR,Carla
  *   INICIAR,Carla
- *   TIRAR_DADOS,Carla
- *   TERMINAR_TURNO,Carla
+ *   TERMINAR_TURNO,Carla      (los dados y las tarjetas solo llegan del hardware)
+ *   TERMINAR_PARTIDA,Carla
  *   EXIT
  */
 public class ConsoleClient {
@@ -36,7 +36,7 @@ public class ConsoleClient {
         client.startListening();
 
         System.out.println("Conectado a " + host + ":" + port);
-        System.out.println("Comandos: CONECTAR,nombre | INICIAR,nombre | TIRAR_DADOS,nombre | TERMINAR_TURNO,nombre | CONSULTAR_ESTADO | EXIT");
+        System.out.println("Comandos: CONECTAR,nombre | INICIAR,nombre | TERMINAR_TURNO,nombre | TERMINAR_PARTIDA,nombre | CONSULTAR_ESTADO | EXIT");
 
         try (Scanner scanner = new Scanner(System.in)) {
             while (scanner.hasNextLine()) {

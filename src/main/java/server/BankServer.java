@@ -9,7 +9,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.Enumeration;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * El "banco": unico dueno del estado oficial de la partida.
@@ -31,10 +30,6 @@ public class BankServer {
     // conexiones y se recorre desde los hilos de cada cliente.
     private static final CopyOnWriteArrayList<ClientHandler> connectedClients = new CopyOnWriteArrayList<>();
     private static final GameSession session = new GameSession();
-
-    // false = los dados los genera el servidor al recibir TIRAR_DADOS (pruebas).
-    // true  = los dados llegan del hardware mediante hardwareRolled(d1, d2).
-    private static volatile boolean useHardwareDice = false;
 
     // ---------------------------------------------------------------- inicio
 
@@ -94,15 +89,8 @@ public class BankServer {
         return session;
     }
 
-    // ---------------------------------------------------------------- dados
-
-    public static void setUseHardwareDice(boolean value) {
-        useHardwareDice = value;
-    }
-
-    public static boolean usesHardwareDice() {
-        return useHardwareDice;
-    }
+    // ------------------------------------------------------------- hardware
+    // Los dados y las tarjetas SOLO llegan de la Pico: no hay version simulada.
 
     /**
      * PUNTO DE ENTRADA DEL HARDWARE.
@@ -130,25 +118,12 @@ public class BankServer {
         }
     }
 
-    /** Tarjeta simulada: lo usa ClientHandler cuando no hay hardware. */
-    static String cardSimulated(String player) {
-        String uid = session.cardOf(player);
-        if (uid == null) return "PARTIDA_NO_INICIADA";
-        hardwareCard(uid);
-        return GameSession.OK;
-    }
-
     private static volatile HardwareLink hardwareLink;
 
-    /**
-     * Se conecta a la Pico (que es servidor TCP) y activa el modo hardware:
-     * desde ahora TIRAR_DADOS y PASAR_TARJETA se rechazan; los dados y las
-     * tarjetas solo llegan de la Pico.
-     */
+    /** Se conecta a la Pico (que es servidor TCP) para recibir los dados y las tarjetas. */
     public static synchronized void startHardware(String host, int port) {
         if (hardwareLink != null) hardwareLink.stop();
         hardwareLink = HardwareLink.start(host, port);
-        setUseHardwareDice(true);
     }
 
     public static synchronized void stopHardware() {
@@ -156,17 +131,6 @@ public class BankServer {
             hardwareLink.stop();
             hardwareLink = null;
         }
-    }
-
-    /** Lanzamiento simulado: lo usa ClientHandler cuando no hay hardware. */
-    static String rollSimulated(String player) {
-        String result = session.tryRoll(player);
-        if (result.equals(GameSession.OK)) {
-            int d1 = ThreadLocalRandom.current().nextInt(1, 7);
-            int d2 = ThreadLocalRandom.current().nextInt(1, 7);
-            announceRoll(player, d1, d2);
-        }
-        return result;
     }
 
     private static void announceRoll(String player, int d1, int d2) {

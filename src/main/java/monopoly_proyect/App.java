@@ -81,7 +81,6 @@ public class App extends Application {
                 ? new String[]{datos.nombre()}
                 : new String[]{datos.nombre(), datos.nombre2()};
         interfaz.conectarRed(client::send, locales);
-        interfaz.usarHardware(datos.organizador() && !datos.ipPico().isEmpty());
 
         //Los mensajes llegan en un hilo de red: Platform.runLater los pasa al hilo de JavaFX
         client.setOnMessage(mensaje -> Platform.runLater(() -> interfaz.procesarMensaje(mensaje)));
