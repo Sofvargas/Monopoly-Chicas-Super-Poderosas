@@ -149,10 +149,43 @@ public class GameSession {
         return lines;
     }
 
-    /** UID de la tarjeta de 'name', o null si no tiene (partida sin iniciar o jugador desconocido). */
-    public synchronized String cardOf(String name) {
-        Player p = find(name);
-        return (p == null || p.getCard() == null) ? null : p.getCard().getUid();
+    /**
+     * Termina la partida para todos (cualquier jugador puede pedirlo). Tambien se
+     * puede llamar con la partida ya terminada, para volver a ver el historial.
+     */
+    public synchronized String endGame() {
+        if (!started) return "PARTIDA_NO_INICIADA";
+        finished = true;
+        deudor = null;
+        propiedadPendiente = null;
+        return OK;
+    }
+
+    /**
+     * El historial completo, de la transaccion mas antigua a la mas nueva, una linea por cada una:
+     *   TRANSACCION,id,turno,tipo,origen,destino,monto,descripcion
+     * Origen y destino van con el nombre del jugador (o "Banco") en vez del id interno.
+     */
+    public synchronized String[] historyAsLines() {
+        StringBuilder out = new StringBuilder();
+        DoubleNode<Transaction> nodo = transactions.getOldest();
+        if (nodo == null) return new String[0];
+        while (nodo != null) {
+            Transaction t = nodo.getData();
+            linea(out, "TRANSACCION," + t.getId() + "," + t.getTurnNumber() + "," + t.getType() + ","
+                    + nombreDe(t.getSourcePlayerId()) + "," + nombreDe(t.getDestinationPlayerId()) + ","
+                    + Math.round(t.getAmount()) + "," + t.getDescription());
+            nodo = nodo.getNext();
+        }
+        return lineas(out);
+    }
+
+    /** Nombre del jugador con ese id ("P1" -> "Ana"); el banco sale como "Banco". */
+    private String nombreDe(String id) {
+        for (int i = 0; i < count; i++) {
+            if (players[i].getId().equals(id)) return players[i].getName();
+        }
+        return "Banco";
     }
 
     /**
@@ -484,7 +517,7 @@ public class GameSession {
         return out.toString().split("\n");
     }
 
-    /** Historial de transacciones (para imprimir, buscar y exportar a TXT mas adelante). */
+    /** Historial de transacciones (lo que se envia a las pantallas sale de historyAsLines). */
     public synchronized DoublyLinkedList<Transaction> getTransactions() {
         return transactions;
     }

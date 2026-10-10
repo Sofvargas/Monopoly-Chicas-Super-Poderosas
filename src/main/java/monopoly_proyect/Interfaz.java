@@ -2,13 +2,22 @@ package monopoly_proyect;
 
 import java.io.InputStream;
 import java.util.function.Consumer;
+import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.DoubleBinding;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -17,6 +26,8 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import models.Tablero;
 
 public class Interfaz {
@@ -35,9 +46,14 @@ public class Interfaz {
     private final Label lblTurno = new Label("Esperando jugadores...");
     private final Button btnIniciar = new Button("Iniciar partida");
     private final Button btnTerminar = new Button("Terminar turno");
-    private final Button btnDadoPrueba = new Button("Dado de prueba");
-    private final Button btnTarjetaPrueba = new Button("Tarjeta de prueba");
+    private final Button btnTerminarPartida = new Button("Terminar partida");
     private final TextArea registro = new TextArea();
+
+    // ----- Historial de transacciones (llega del servidor al terminar la partida) -----
+    // Cada fila: {id, turno, tipo, de, para, monto, descripcion}
+    private final ObservableList<String[]> historial = FXCollections.observableArrayList();
+    private String quienTermino = "";
+    private Stage ventanaHistorial;
 
     private Consumer<String> enviarComando = comando -> { };
     private String[] jugadoresLocales = new String[0];
@@ -79,22 +95,19 @@ public class Interfaz {
         });
         btnTerminar.setOnAction(e -> enviarComando.accept("TERMINAR_TURNO," + turnoActual));
 
-        // El "Dado de prueba" solo existe si NO hay hardware (ver usarHardware).
-        btnDadoPrueba.setDisable(true);
-        btnDadoPrueba.setOnAction(e -> enviarComando.accept("TIRAR_DADOS," + turnoActual));
-
-        // "Tarjeta de prueba": simula que el jugador en turno acerco su tarjeta al lector.
-        // Igual que el dado, solo existe si NO hay hardware.
-        btnTarjetaPrueba.setDisable(true);
-        btnTarjetaPrueba.setOnAction(e -> enviarComando.accept("PASAR_TARJETA," + turnoActual));
+        // "Terminar partida": cualquiera de las computadoras puede pulsarlo (no depende
+        // del turno). Termina la partida para TODOS y el servidor responde con el historial.
+        // Los dados y las tarjetas no tienen boton: solo llegan del hardware.
+        btnTerminarPartida.getStyleClass().add("boton-principal");
+        btnTerminarPartida.setDisable(true); // se activa cuando la partida inicia
+        btnTerminarPartida.setOnAction(e -> pedirTerminarPartida());
 
         // Que los botones ocupen todo el ancho del panel
         btnIniciar.setMaxWidth(Double.MAX_VALUE);
         btnTerminar.setMaxWidth(Double.MAX_VALUE);
-        btnDadoPrueba.setMaxWidth(Double.MAX_VALUE);
-        btnTarjetaPrueba.setMaxWidth(Double.MAX_VALUE);
+        btnTerminarPartida.setMaxWidth(Double.MAX_VALUE);
 
-        VBox panel = new VBox(10, lblTurno, btnIniciar, btnTerminar, btnDadoPrueba, btnTarjetaPrueba, registro);
+        VBox panel = new VBox(10, lblTurno, btnIniciar, btnTerminar, btnTerminarPartida, registro);
         panel.setPadding(new Insets(10));
         panel.setPrefWidth(ANCHO_PANEL);
         panel.setMinWidth(ANCHO_PANEL);
@@ -119,17 +132,6 @@ public class Interfaz {
         this.jugadoresLocales = locales;
     }
 
-    /**
-     * Si hay hardware conectado, la ventana no debe tener ningun control de dados
-     * ni de tarjetas: se quitan los botones de prueba.
-     */
-    public void usarHardware(boolean hayHardware) {
-        btnDadoPrueba.setVisible(!hayHardware);
-        btnDadoPrueba.setManaged(!hayHardware);
-        btnTarjetaPrueba.setVisible(!hayHardware);
-        btnTarjetaPrueba.setManaged(!hayHardware);
-    }
-
     /** Interpreta cada mensaje del servidor. Siempre se llama desde el hilo de JavaFX. */
     public void procesarMensaje(String linea) {
         String[] p = linea.split(",", -1);
@@ -137,6 +139,7 @@ public class Interfaz {
             case "JUGADORES" -> mostrarMensaje("Jugadores conectados: " + (p.length > 1 ? p[1].replace(";", ", ") : ""));
             case "INICIADA" -> {
                 btnIniciar.setDisable(true);
+                btnTerminarPartida.setDisable(false);
                 mostrarMensaje("¡La partida comenzó!");
             }
             case "TURNO" -> {
@@ -144,8 +147,6 @@ public class Interfaz {
                 lblTurno.setText("Turno de: " + turnoActual);
                 boolean leToca = esLocal(turnoActual); // true solo si le toca a alguien de ESTA computadora
                 btnTerminar.setDisable(!leToca);
-                btnDadoPrueba.setDisable(!leToca);
-                btnTarjetaPrueba.setDisable(!leToca);
                 mostrarMensaje("Turno de " + turnoActual);
             }
             case "TARJETA_ASIGNADA" -> mostrarMensaje(p[1] + " recibió la tarjeta " + p[2]);
@@ -155,9 +156,21 @@ public class Interfaz {
             case "GANADOR" -> {
                 lblTurno.setText("¡Ganó " + p[1] + "!");
                 btnTerminar.setDisable(true);
-                btnDadoPrueba.setDisable(true);
-                btnTarjetaPrueba.setDisable(true);
-                mostrarMensaje("Fin de la partida. ¡Ganó " + p[1] + "!");
+                mostrarMensaje("Fin de la partida. ¡Ganó " + p[1] + "! Pulsa \"Terminar partida\" para ver el historial.");
+            }
+            // El historial llega en varias lineas: INICIO, una TRANSACCION por fila y FIN
+            case "HISTORIAL_INICIO" -> {
+                historial.clear();
+                quienTermino = p.length > 1 ? p[1] : "";
+            }
+            case "TRANSACCION" -> agregarTransaccion(p);
+            case "HISTORIAL_FIN" -> {
+                btnTerminar.setDisable(true);
+                if (!lblTurno.getText().startsWith("¡Ganó")) {
+                    lblTurno.setText("Partida terminada");
+                }
+                mostrarMensaje(quienTermino + " terminó la partida.");
+                mostrarHistorial();
             }
             case "DADOS" -> mostrarDados(p, linea);
             case "POSICION" -> mostrarMensaje(p[1] + " avanzó a " + p[3] + " (casilla " + p[2] + ")");
@@ -189,6 +202,83 @@ public class Interfaz {
 
     public void mostrarMensaje(String texto) {
         registro.appendText(texto + "\n");
+    }
+
+    // ========================================================== HISTORIAL
+
+    /** Pide confirmacion (termina la partida de todos) y avisa al servidor. */
+    private void pedirTerminarPartida() {
+        if (jugadoresLocales.length == 0) return;
+        Alert confirmacion = new Alert(Alert.AlertType.CONFIRMATION,
+                "La partida se termina para todos los jugadores y se muestra el historial.",
+                ButtonType.OK, ButtonType.CANCEL);
+        confirmacion.setTitle("Terminar partida");
+        confirmacion.setHeaderText("¿Terminar la partida?");
+        confirmacion.initOwner(root.getScene().getWindow());
+        if (confirmacion.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK) {
+            enviarComando.accept("TERMINAR_PARTIDA," + jugadoresLocales[0]);
+        }
+    }
+
+    /** Guarda una linea "TRANSACCION,id,turno,tipo,origen,destino,monto,descripcion" como fila. */
+    private void agregarTransaccion(String[] p) {
+        if (p.length < 8) return; // linea mal formada
+        historial.add(new String[] { p[1], p[2], tipoLegible(p[3]), p[4], p[5], "$" + p[6], p[7] });
+    }
+
+    private String tipoLegible(String tipo) {
+        return switch (tipo) {
+            case "PROPERTY_PURCHASE" -> "Compra";
+            case "RENT_PAYMENT" -> "Alquiler";
+            case "SALARY" -> "Salario";
+            case "EVENT_GAIN" -> "Carta (cobro)";
+            case "EVENT_LOSS" -> "Carta (pago)";
+            case "BANKRUPTCY" -> "Quiebra";
+            default -> tipo;
+        };
+    }
+
+    /** Ventana flotante con el historial de transacciones y el boton para salir del juego. */
+    private void mostrarHistorial() {
+        if (ventanaHistorial != null) {
+            ventanaHistorial.close(); // si alguien volvio a pulsar, se reemplaza la anterior
+        }
+
+        Label titulo = new Label("Historial de transacciones");
+        titulo.getStyleClass().add("titulo");
+        Label detalle = new Label(quienTermino + " terminó la partida. Transacciones: " + historial.size());
+
+        TableView<String[]> tabla = new TableView<>(historial);
+        tabla.setPlaceholder(new Label("No hubo transacciones en esta partida."));
+        tabla.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        String[] encabezados = { "#", "Turno", "Tipo", "De", "Para", "Monto", "Descripción" };
+        for (int i = 0; i < encabezados.length; i++) {
+            int campo = i;
+            TableColumn<String[], String> columna = new TableColumn<>(encabezados[i]);
+            columna.setCellValueFactory(fila -> new SimpleStringProperty(fila.getValue()[campo]));
+            columna.setSortable(false); // el orden es el de la partida
+            tabla.getColumns().add(columna);
+        }
+        VBox.setVgrow(tabla, Priority.ALWAYS);
+
+        Button btnSalir = new Button("Salir del juego");
+        btnSalir.getStyleClass().add("boton-principal");
+        btnSalir.setMaxWidth(Double.MAX_VALUE);
+        btnSalir.setOnAction(e -> Platform.exit()); // cierra la aplicacion (App.stop cierra la red)
+
+        VBox contenido = new VBox(10, titulo, detalle, tabla, btnSalir);
+        contenido.setPadding(new Insets(15));
+        contenido.getStyleClass().add("fondo");
+
+        Scene escena = new Scene(contenido, 780, 480);
+        escena.getStylesheets().addAll(root.getScene().getStylesheets());
+
+        ventanaHistorial = new Stage();
+        ventanaHistorial.setTitle("Historial de transacciones");
+        ventanaHistorial.initOwner(root.getScene().getWindow());
+        ventanaHistorial.initModality(Modality.WINDOW_MODAL);
+        ventanaHistorial.setScene(escena);
+        ventanaHistorial.show();
     }
 
     // ============================================================ TABLERO
