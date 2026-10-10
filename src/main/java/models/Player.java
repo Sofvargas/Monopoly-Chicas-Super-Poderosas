@@ -35,6 +35,8 @@ public class Player {
     public void addProperty(Property property) {
         this.ownedProperties.add(property);
     }
+}
+
     public double calculateNetWorth() {
         double netWorth = this.balance;
         
