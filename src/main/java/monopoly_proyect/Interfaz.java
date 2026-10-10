@@ -56,6 +56,7 @@ public class Interfaz {
 
     // ----- Red -----
     private final Label lblTurno = new Label("Esperando jugadores...");
+    private final Label lblDados = new Label("Dados: -"); // lo que sacaron los dados fisicos en este turno
     private final Button btnIniciar = new Button("Iniciar partida");
     private final Button btnTerminar = new Button("Terminar turno");
     private final Button btnTerminarPartida = new Button("Terminar partida");
@@ -139,7 +140,10 @@ public class Interfaz {
         btnTerminar.setMaxWidth(Double.MAX_VALUE);
         btnTerminarPartida.setMaxWidth(Double.MAX_VALUE);
 
-        VBox panel = new VBox(10, lblTurno, btnIniciar, btnTerminar, btnTerminarPartida, listaJugadores, registro);
+        lblDados.setWrapText(true);
+        lblDados.setStyle("-fx-font-weight: bold;");
+
+        VBox panel = new VBox(10, lblTurno, lblDados, btnIniciar, btnTerminar, btnTerminarPartida, listaJugadores, registro);
         panel.setPadding(new Insets(10));
         panel.setPrefWidth(ANCHO_PANEL);
         panel.setMinWidth(ANCHO_PANEL);
@@ -177,6 +181,7 @@ public class Interfaz {
             case "TURNO" -> {
                 turnoActual = p.length > 1 ? p[1] : "";
                 lblTurno.setText("Turno de: " + turnoActual);
+                lblDados.setText("Dados: " + turnoActual + " aún no lanza");
                 boolean leToca = esLocal(turnoActual); // true solo si le toca a alguien de ESTA computadora
                 btnTerminar.setDisable(!leToca);
                 resaltarTurno();
@@ -233,6 +238,7 @@ public class Interfaz {
         try {
             int d1 = Integer.parseInt(p[2]);
             int d2 = Integer.parseInt(p[3]);
+            lblDados.setText("Dados: " + d1 + " y " + d2 + " (total " + (d1 + d2) + ")");
             mostrarMensaje(p[1] + " sacó " + d1 + " y " + d2 + " (total " + (d1 + d2) + ")");
         } catch (RuntimeException e) {
             mostrarMensaje(linea); // mensaje mal formado: se muestra tal cual
