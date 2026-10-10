@@ -5,6 +5,7 @@ import network
 import socket
 from mfrc522 import MFRC522
 
+# ---------------- Configuración ----------------
 #Configuración
 SSID = "Mari"
 PASSWORD = "Mari2016"
@@ -14,6 +15,7 @@ BOTON_PIN = 19           # GP19 (pin físico 25); el otro lado del botón va a G
 SEG_ON = 0               # ánodo común
 DIG_ON = 0               # transistores PNP
 
+# ---------------- Display (se refresca solo con un Timer) ----------------
 #Display (se refresca solo con un Timer)
 segmentos = [Pin(n, Pin.OUT) for n in (14, 13, 12, 11, 18, 17, 16)]  # a b c d e f g
 digitos = [Pin(9, Pin.OUT), Pin(10, Pin.OUT)]                         # [0]=dado 1, [1]=dado 2
