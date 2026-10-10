@@ -19,17 +19,28 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *   Cliente -> Servidor
  *     CONECTAR,jugador          registra un jugador en esta computadora
  *     INICIAR,jugador           inicia la partida (minimo 2 jugadores)
- *     TIRAR_DADOS,jugador       lanzamiento simulado (solo si no hay hardware)
  *     TERMINAR_TURNO,jugador    pasa el turno
+ *     TERMINAR_PARTIDA,jugador  termina la partida para todos y pide el historial
  *     CONSULTAR_ESTADO          pide la lista de jugadores y el turno
+ *   (los dados y las tarjetas no son comandos: solo llegan del hardware)
  *   Servidor -> Cliente
  *     OK,CONECTADO,jugador      confirmacion (solo a quien la pidio)
  *     ERROR,codigo              rechazo (solo a quien la pidio)
  *     JUGADORES,a;b;c           (a todos) lista de jugadores
  *     INICIADA,a;b;c            (a todos) la partida comenzo
+ *     TARJETA_ASIGNADA,jugador,alias   (a todos) tarjeta que le toco a cada jugador
  *     TURNO,jugador             (a todos) de quien es el turno
  *     DADOS,jugador,d1,d2       (a todos) resultado de los dados
- *     MENSAJE,texto             (a todos) aviso informativo
+ *     POSICION,jugador,indice,casilla  (a todos) a donde llego la ficha
+ *     SALDO,jugador,saldo       (a todos) saldo nuevo de un jugador
+ *     PROPIEDAD,jugador,indice,casilla (a todos) el jugador compro esa casilla
+ *     CARTA,jugador,descripcion (a todos) carta sorpresa que saco el jugador
+ *     ELIMINADO,jugador         (a todos) no pudo pagar un alquiler y sale del juego
+ *     GANADOR,jugador           (a todos) solo queda un jugador: fin de la partida
+ *     HISTORIAL_INICIO,jugador  (a todos) 'jugador' termino la partida; siguen las transacciones
+ *     TRANSACCION,id,turno,tipo,origen,destino,monto,descripcion   (a todos) una por linea
+ *     HISTORIAL_FIN             (a todos) fin del historial: la ventana ya puede mostrarlo
+ *     MENSAJE,texto             (a todos) aviso informativo (el texto no lleva comas)
  */
 public class ClientHandler implements Runnable {
 
@@ -49,25 +60,6 @@ public class ClientHandler implements Runnable {
             this.out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
         } catch (IOException e) {
             System.err.println("Error preparando la conexion: " + e.getMessage());
-import java.io.PrintWriter;
-import java.net.Socket;
-
-import models.Player;
-
-public class ClientHandler implements Runnable {
-    private Socket socket;
-    private BufferedReader in;
-    private PrintWriter out;
-    private Bank bank;
-
-    public ClientHandler(Socket socket, Bank bank) {
-        this.socket = socket;
-        this.bank = bank;
-        try {
-            this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            this.out = new PrintWriter(socket.getOutputStream(), true);
-        } catch (IOException e) {
-            System.err.println("Error setting up client streams: " + e.getMessage());
         }
     }
 
@@ -100,8 +92,8 @@ public class ClientHandler implements Runnable {
         switch (action) {
             case "CONECTAR" -> handleConnect(player);
             case "INICIAR" -> handleStart(player);
-            case "TIRAR_DADOS" -> handleRoll(player);
             case "TERMINAR_TURNO" -> handleEndTurn(player);
+            case "TERMINAR_PARTIDA" -> handleEndGame(player);
             case "CONSULTAR_ESTADO" -> sendState();
             default -> send("ERROR,COMANDO_DESCONOCIDO");
         }
@@ -132,19 +124,25 @@ public class ClientHandler implements Runnable {
             return;
         }
         BankServer.broadcast("INICIADA," + BankServer.session().playersAsText());
+        for (String line : BankServer.session().cardsAsLines()) {
+            BankServer.broadcast(line);
+        }
         BankServer.broadcast("TURNO," + BankServer.session().currentPlayer());
     }
 
-    private void handleRoll(String player) {
+    /** Termina la partida para todos y les envia el historial de transacciones. */
+    private void handleEndGame(String player) {
         if (!owns(player)) return;
-        if (BankServer.usesHardwareDice()) {
-            send("ERROR,USA_EL_BOTON_FISICO");
-            return;
-        }
-        String result = BankServer.rollSimulated(player);
+        String result = BankServer.session().endGame();
         if (!result.equals(GameSession.OK)) {
             send("ERROR," + result);
+            return;
         }
+        BankServer.broadcast("HISTORIAL_INICIO," + player);
+        for (String line : BankServer.session().historyAsLines()) {
+            BankServer.broadcast(line);
+        }
+        BankServer.broadcast("HISTORIAL_FIN");
     }
 
     private void handleEndTurn(String player) {
@@ -153,6 +151,10 @@ public class ClientHandler implements Runnable {
         if (!result.equals(GameSession.OK)) {
             send("ERROR," + result);
             return;
+        }
+        // Avisos de jugadores en la carcel a los que se les salto el turno
+        for (String line : BankServer.session().takeNotices()) {
+            BankServer.broadcast(line);
         }
         BankServer.broadcast("TURNO," + BankServer.session().currentPlayer());
     }
@@ -177,108 +179,6 @@ public class ClientHandler implements Runnable {
     // ------------------------------------------------------------- utilidades
 
     public void send(String message) {
-        String inputLine;
-        try {
-            while ((inputLine = in.readLine()) != null) {
-                System.out.println("Received from client: " + inputLine);
-                processCommand(inputLine, this.bank);
-            }
-        } catch (IOException e) {
-            System.out.println("Player disconnected.");
-        } finally {
-            closeConnections();
-        }
-    }
-
-    private void processCommand(String command, Bank bank) {
-        // Aquí definen el protocolo solicitado en el documento
-        String[] parts = command.split(",");
-        String action = parts[0];
-
-        switch (action) {
-            case "CONECTAR":
-                Player newplayer = new Player(parts[1], parts[1] + "_Name", 1500.0);
-                bank.addPlayer(newplayer);
-                sendMessage("SUCCESS,CONNECTED_TO_BANK");
-                break;
-            case "TIRAR_DADOS":
-                if (parts.length >= 2) {
-                    String playerId = parts[1];
-                    String rollResult = bank.rollDiceAndMove(playerId);
-                    
-                    if (rollResult.startsWith("SUCCESS")) {
-                        // Send the result to the player who rolled
-                        sendMessage(rollResult);
-                        // Notify everyone else on the network that the board changed
-                        BankServer.broadcastMessage("UPDATE_BOARD," + playerId + " moved.");
-                    } else {
-                        // Send the error (e.g., NOT_YOUR_TURN)
-                        sendMessage(rollResult);
-                    }
-                } else {
-                    sendMessage("ERROR,MISSING_PLAYER_ID");
-                }
-                break;
-            case "COMPRAR_PROPIEDAD":
-                // Validar fondos y estado del banco
-                if (parts.length >= 2) {
-                    String playerId = parts[1];
-                    String PurchaseResult = bank.buyProperty(playerId);
-                    sendMessage(PurchaseResult);
-                    if (PurchaseResult.startsWith("SUCCESS")) {
-                        BankServer.broadcastMessage("UPDATE_BOARD," + playerId + "_bought_property");
-                        // Notify the player of the error
-                        sendMessage(PurchaseResult);
-                    } else {
-                        // Notify everyone else on the network that the property was purchased
-                        BankServer.broadcastMessage("UPDATE_PROPERTY_PURCHASED," + playerId);
-                    }
-                } else {
-                    sendMessage("ERROR,MISSING_PLAYER_ID");
-                }
-                sendMessage("SUCCESS,PROPERTY_PURCHASED");
-                break;
-            case "TERMINAR_TURNO":
-                bank.advanceTurn();
-                BankServer.broadcastMessage("UPDATE, TURN_ADVANCED");
-                break;
-            default:
-                sendMessage("ERROR,UNKNOWN_COMMAND");
-                break;
-        
-        case "SACAR_CARTA":
-                if (parts.length >= 2) {
-                    String playerId = parts[1];
-                    String cardResult = bank.drawEventCard(playerId);
-                    sendMessage(cardResult);
-                    
-                    if (cardResult.startsWith("SUCCESS")) {
-                        BankServer.broadcastMessage("UPDATE_BOARD," + playerId + "_drew_a_card");
-                    }
-                } else {
-                    sendMessage("ERROR,MISSING_PLAYER_ID");
-                }
-                break;
-        case "PAGAR_ALQUILER":
-            if (parts.length >= 2) {
-                String playerId = parts[1];
-                String rentResult = bank.payRent(playerId);
-                sendMessage(rentResult);
-                    
-                if (rentResult.startsWith("SUCCESS,RENT_PAID")) {
-                    BankServer.broadcastMessage("UPDATE_BOARD," + playerId + "_paid_rent");
-                    }
-                } else {
-                    sendMessage("ERROR,MISSING_PLAYER_ID");
-                }
-                break;
-        case "EXPORTAR_HISTORIAL":
-                    String exportResult = bank.exportTransactions();
-                    sendMessage(exportResult);
-                    break; }   
-    }
-
-    public void sendMessage(String message) {
         if (out != null) {
             out.println(message);
         }
@@ -293,13 +193,7 @@ public class ClientHandler implements Runnable {
             socket.close(); // tambien cierra los flujos
         } catch (IOException ignored) {
             // nada que hacer
-    private void closeConnections() {
-        try {
-            if (in != null) in.close();
-            if (out != null) out.close();
-            if (socket != null) socket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }
+

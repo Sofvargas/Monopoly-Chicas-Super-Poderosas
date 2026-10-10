@@ -8,6 +8,8 @@ public class SpecialSquare extends Square {
         this.specialActionType = specialActionType;
     }
 
+    public String getSpecialActionType() { return specialActionType; }
+
     @Override
     public void executeAction(Player player) {
         System.out.println("Special action triggered: " + specialActionType);

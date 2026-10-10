@@ -9,7 +9,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.Enumeration;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * El "banco": unico dueno del estado oficial de la partida.
@@ -31,10 +30,6 @@ public class BankServer {
     // conexiones y se recorre desde los hilos de cada cliente.
     private static final CopyOnWriteArrayList<ClientHandler> connectedClients = new CopyOnWriteArrayList<>();
     private static final GameSession session = new GameSession();
-
-    // false = los dados los genera el servidor al recibir TIRAR_DADOS (pruebas).
-    // true  = los dados llegan del hardware mediante hardwareRolled(d1, d2).
-    private static volatile boolean useHardwareDice = false;
 
     // ---------------------------------------------------------------- inicio
 
@@ -94,15 +89,8 @@ public class BankServer {
         return session;
     }
 
-    // ---------------------------------------------------------------- dados
-
-    public static void setUseHardwareDice(boolean value) {
-        useHardwareDice = value;
-    }
-
-    public static boolean usesHardwareDice() {
-        return useHardwareDice;
-    }
+    // ------------------------------------------------------------- hardware
+    // Los dados y las tarjetas SOLO llegan de la Pico: no hay version simulada.
 
     /**
      * PUNTO DE ENTRADA DEL HARDWARE.
@@ -121,23 +109,21 @@ public class BankServer {
     }
 
     /**
-     * Una tarjeta RFID fue leida por el hardware. Por ahora solo se avisa a todos.
-     * PENDIENTE: definir que significa (identificar al jugador, pagar, etc.).
+     * Una tarjeta RFID fue leida por el hardware. Si hay un cobro pendiente y es
+     * la tarjeta del jugador que debe pagar, se ejecuta; si no, solo se informa.
      */
     public static void hardwareCard(String uid) {
-        broadcast("TARJETA," + uid);
+        for (String line : session.cardTapped(uid)) {
+            broadcast(line);
+        }
     }
 
     private static volatile HardwareLink hardwareLink;
 
-    /**
-     * Se conecta a la Pico (que es servidor TCP) y activa el modo hardware:
-     * desde ahora TIRAR_DADOS se rechaza y los dados solo llegan de la Pico.
-     */
+    /** Se conecta a la Pico (que es servidor TCP) para recibir los dados y las tarjetas. */
     public static synchronized void startHardware(String host, int port) {
         if (hardwareLink != null) hardwareLink.stop();
         hardwareLink = HardwareLink.start(host, port);
-        setUseHardwareDice(true);
     }
 
     public static synchronized void stopHardware() {
@@ -147,24 +133,13 @@ public class BankServer {
         }
     }
 
-    /** Lanzamiento simulado: lo usa ClientHandler cuando no hay hardware. */
-    static String rollSimulated(String player) {
-        String result = session.tryRoll(player);
-        if (result.equals(GameSession.OK)) {
-            int d1 = ThreadLocalRandom.current().nextInt(1, 7);
-            int d2 = ThreadLocalRandom.current().nextInt(1, 7);
-            announceRoll(player, d1, d2);
-        }
-        return result;
-    }
-
     private static void announceRoll(String player, int d1, int d2) {
         broadcast("DADOS," + player + "," + d1 + "," + d2);
-        // Mueve la ficha por el tablero circular, cobra el salario y avisa a todos
+        // Mueve la ficha por el tablero circular, cobra el salario, deja pendiente
+        // la compra o el alquiler (se pagan con la tarjeta) y avisa a todos
         for (String line : session.applyRoll(d1, d2)) {
             broadcast(line);
         }
-        // PENDIENTE (Juego/Banco): comprar propiedad, cobrar alquiler, cartas de evento.
     }
 
     // ---------------------------------------------------------------- ayuda
@@ -190,48 +165,5 @@ public class BankServer {
             return "(no se pudo leer)";
         }
         return sb.length() == 0 ? "(sin red)" : sb.toString();
-    }
-}
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
-
-public class BankServer {
-    private static final int PORT = 8080;
-    // Lista temporal (pueden cambiarla luego por su estructura personalizada si lo desean para los hilos)
-    private static List<ClientHandler> connectedClients = new ArrayList<>();
-
-    public static void main(String[] args) {
-        System.out.println("Starting Bank Server on port " + PORT + "..."); // Instancia del banco que manejará la lógica del juego
-        Bank mainBank = new Bank(); // Instancia del banco que manejará la lógica del juego
-        String raspberryIp = "192.168.1.50"; // Cambiar IP por la que imprima la Pico
-        int raspberryPort = 8080;
-        
-        HardwareListener hwListener = new HardwareListener(raspberryIp, raspberryPort, mainBank);
-        new Thread(hwListener).start();
-        
-        try (java.net.ServerSocket serverSocket = new java.net.ServerSocket(PORT)) {
-            System.out.println("Bank is waiting for players to connect...");
-
-            while (true) {
-                java.net.Socket clientSocket = serverSocket.accept();
-                System.out.println("New player connected: " + clientSocket.getInetAddress().getHostAddress());
-                
-                // Creamos un nuevo hilo para cada jugadora que se conecta
-                ClientHandler clientThread = new ClientHandler(clientSocket, mainBank);
-                connectedClients.add(clientThread);
-                new Thread(clientThread).start();
-            }
-        } catch (IOException e) {
-            System.err.println("Server Error: " + e.getMessage());
-        }
-    }
-
-    // Método para enviar actualizaciones a todos los clientes (Broadcast)
-    public static void broadcastMessage(String message) {
-        for (ClientHandler client : connectedClients) {
-            client.sendMessage(message);
-        }
     }
 }
