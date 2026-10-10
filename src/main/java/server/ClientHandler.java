@@ -34,6 +34,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *     POSICION,jugador,indice,casilla  (a todos) a donde llego la ficha
  *     SALDO,jugador,saldo       (a todos) saldo nuevo de un jugador
  *     PROPIEDAD,jugador,indice,casilla (a todos) el jugador compro esa casilla
+ *     CARTA,jugador,descripcion (a todos) carta sorpresa que saco el jugador
  *     ELIMINADO,jugador         (a todos) no pudo pagar un alquiler y sale del juego
  *     GANADOR,jugador           (a todos) solo queda un jugador: fin de la partida
  *     MENSAJE,texto             (a todos) aviso informativo (el texto no lleva comas)

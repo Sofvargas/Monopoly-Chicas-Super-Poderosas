@@ -9,9 +9,9 @@ import structures.CircularDoublyLinkedList;
 public class Tablero {
 
     public static final String[] NOMBRES = {
-        "Inicio", "Laboratorio", "Carta sorpresa", "Parque", "Escuela", "Biblioteca",
+        "Inicio", "Laboratorio", "Carta sorpresa", "Parque", "Escuela", "Sorpresa",
         "Cárcel", "Heladería", "Museo", "Carta sorpresa", "Cine", "Estación",
-        "Estacionamiento", "Pastelería", "Zoológico", "Carta sorpresa", "Plaza", "Teatro",
+        "Estacionamiento", "Sorpresa", "Zoológico", "Carta sorpresa", "Plaza", "Teatro",
         "Ir a la cárcel", "Banco", "Playa", "Carta sorpresa", "Aeropuerto", "Castillo"
     };
 
@@ -29,7 +29,8 @@ public class Tablero {
                 case "Ir a la cárcel" -> tablero.insert(new SpecialSquare(id, nombre, "IR_A_CARCEL"));
                 case "Estacionamiento" -> tablero.insert(new SpecialSquare(id, nombre, "DESCANSO"));
                 case "Banco" -> tablero.insert(new SpecialSquare(id, nombre, "BANCO"));
-                case "Carta sorpresa" -> tablero.insert(new EventSquare(id, nombre));
+                // En las dos se saca una carta del mazo (ver Cartas)
+                case "Carta sorpresa", "Sorpresa" -> tablero.insert(new EventSquare(id, nombre));
                 default -> {
                     // Precios provisionales: suben con la posicion. Ajustar al reglamento del grupo.
                     double precio = 60 + i * 10;

@@ -149,6 +149,7 @@ public class Interfaz {
                 mostrarMensaje("Turno de " + turnoActual);
             }
             case "TARJETA_ASIGNADA" -> mostrarMensaje(p[1] + " recibió la tarjeta " + p[2]);
+            case "CARTA" -> mostrarMensaje(p[1] + " sacó una carta: " + p[2]);
             case "PROPIEDAD" -> mostrarMensaje(p[1] + " compró " + p[3]);
             case "ELIMINADO" -> mostrarMensaje(p[1] + " no pudo pagar y quedó fuera del juego. Sus propiedades quedan libres.");
             case "GANADOR" -> {

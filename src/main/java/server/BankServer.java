@@ -176,7 +176,6 @@ public class BankServer {
         for (String line : session.applyRoll(d1, d2)) {
             broadcast(line);
         }
-        // PENDIENTE (Juego/Banco): cartas de evento y casillas especiales.
     }
 
     // ---------------------------------------------------------------- ayuda
