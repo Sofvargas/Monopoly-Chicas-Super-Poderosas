@@ -160,8 +160,11 @@ public class BankServer {
 
     private static void announceRoll(String player, int d1, int d2) {
         broadcast("DADOS," + player + "," + d1 + "," + d2);
-        // PENDIENTE (clases Juego / Banco): mover la ficha de 'player' d1 + d2
-        // casillas por la lista circular, cobrar/pagar y crear las transacciones.
+        // Mueve la ficha por el tablero circular, cobra el salario y avisa a todos
+        for (String line : session.applyRoll(d1, d2)) {
+            broadcast(line);
+        }
+        // PENDIENTE (Juego/Banco): comprar propiedad, cobrar alquiler, cartas de evento.
     }
 
     // ---------------------------------------------------------------- ayuda
@@ -187,5 +190,48 @@ public class BankServer {
             return "(no se pudo leer)";
         }
         return sb.length() == 0 ? "(sin red)" : sb.toString();
+    }
+}
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
+
+public class BankServer {
+    private static final int PORT = 8080;
+    // Lista temporal (pueden cambiarla luego por su estructura personalizada si lo desean para los hilos)
+    private static List<ClientHandler> connectedClients = new ArrayList<>();
+
+    public static void main(String[] args) {
+        System.out.println("Starting Bank Server on port " + PORT + "..."); // Instancia del banco que manejará la lógica del juego
+        Bank mainBank = new Bank(); // Instancia del banco que manejará la lógica del juego
+        String raspberryIp = "192.168.1.50"; // Cambiar IP por la que imprima la Pico
+        int raspberryPort = 8080;
+        
+        HardwareListener hwListener = new HardwareListener(raspberryIp, raspberryPort, mainBank);
+        new Thread(hwListener).start();
+        
+        try (java.net.ServerSocket serverSocket = new java.net.ServerSocket(PORT)) {
+            System.out.println("Bank is waiting for players to connect...");
+
+            while (true) {
+                java.net.Socket clientSocket = serverSocket.accept();
+                System.out.println("New player connected: " + clientSocket.getInetAddress().getHostAddress());
+                
+                // Creamos un nuevo hilo para cada jugadora que se conecta
+                ClientHandler clientThread = new ClientHandler(clientSocket, mainBank);
+                connectedClients.add(clientThread);
+                new Thread(clientThread).start();
+            }
+        } catch (IOException e) {
+            System.err.println("Server Error: " + e.getMessage());
+        }
+    }
+
+    // Método para enviar actualizaciones a todos los clientes (Broadcast)
+    public static void broadcastMessage(String message) {
+        for (ClientHandler client : connectedClients) {
+            client.sendMessage(message);
+        }
     }
 }

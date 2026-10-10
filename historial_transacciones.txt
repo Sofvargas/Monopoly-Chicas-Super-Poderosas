@@ -1,0 +1,16 @@
+ID	TURN	TYPE	SOURCE	DESTINATION	AMOUNT	DESCRIPTION
+----------------------------------------------------------------------
+TX1	1	PROPERTY_PURCHASE	sofia	BANK	60.00	Bought Baltic Ave
+TX2	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX3	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX4	1	EVENT_GAIN	BANK	sofia	200.00	Card: Bank error in your favor. Collect $200
+TX5	1	EVENT_LOSS	sofia	BANK	50.00	Card: Doctor's fee. Pay $50
+TX6	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX7	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX8	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX9	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX10	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX11	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX12	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX13	1	GO_BONUS	BANK	sofia	200.00	Passed GO
+TX14	1	GO_BONUS	BANK	sofia	200.00	Passed GO

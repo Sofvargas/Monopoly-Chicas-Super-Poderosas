@@ -16,4 +16,4 @@ target/
 Thumbs.db
 
 # Logs
-*.log
+*.logtarget/

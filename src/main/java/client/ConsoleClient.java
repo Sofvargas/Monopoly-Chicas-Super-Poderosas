@@ -19,7 +19,7 @@ import java.util.Scanner;
 public class ConsoleClient {
 
     public static void main(String[] args) {
-        String host = args.length > 0 ? args[0] : "127.0.0.1";
+        String host = args.length > 0 ? args[0] : "10.75.198.18";
         int port = args.length > 1 ? Integer.parseInt(args[1]) : 8080;
 
         GameClient client = new GameClient();
