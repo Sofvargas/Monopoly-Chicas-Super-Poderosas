@@ -1,3 +1,7 @@
+// Implementacion de una cola reutilizable generica
+// Ideal para gestionar las cartas de eventos o comunidad: una vez el elemento
+// es extraido y procesado, se reinserta automaticamente al final de la cola
+// asegurando un ciclo infinito de reutilizacion de cartas durante el juego.
 package structures;
 
 public class ReusableQueue<T> {

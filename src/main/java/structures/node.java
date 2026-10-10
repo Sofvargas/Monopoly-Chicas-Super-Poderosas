@@ -1,4 +1,6 @@
 // Node Classes
+// Clase generica que representa un nodo basico para estructuras enlazadas simples
+// Este va a almacenar un valor de tipo generico (T) y una referencia al siguiente de nodo.
 package structures;
 
 public class node<T> { // Singly Linked List and Queues

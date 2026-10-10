@@ -1,3 +1,5 @@
+// implementacion de una lista enlazada simple generica, permite inserciones, busquedas y eliminaciones secuenciales.
+// estan orientads a la gestion de elementos dinamicos en la logica del juego
 package structures;
 
 public class SinglyLinkedList<T> {
