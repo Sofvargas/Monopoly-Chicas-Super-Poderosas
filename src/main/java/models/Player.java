@@ -8,6 +8,7 @@ public class Player {
     private int currentPositionIndex;
     private boolean isActive;
     private SinglyLinkedList<Property> ownedProperties; // Tu estructura personalizada
+    private int turnosEnCarcel = 0;
     private Tarjeta card; // tarjeta RFID asignada al iniciar la partida (null antes de eso)
 
     public Player(String id, String name, double startingBalance) {
@@ -32,6 +33,10 @@ public class Player {
     public void setActive(boolean active) { isActive = active; }
     
     public SinglyLinkedList<Property> getOwnedProperties() { return ownedProperties; }
+
+    // Turnos que le falta perder por estar en la carcel (0 = juega normal)
+    public int getTurnosEnCarcel() { return turnosEnCarcel; }
+    public void setTurnosEnCarcel(int turnosEnCarcel) { this.turnosEnCarcel = turnosEnCarcel; }
 
     public Tarjeta getCard() { return card; }
     public void setCard(Tarjeta card) { this.card = card; }

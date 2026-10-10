@@ -16,6 +16,7 @@ public class Tablero {
     };
 
     public static final double SALARIO_POR_VUELTA = 200;
+    public static final int TURNOS_EN_CARCEL = 2; // turnos que pierde quien cae en la carcel
 
     public static CircularDoublyLinkedList<Square> crear() {
         CircularDoublyLinkedList<Square> tablero = new CircularDoublyLinkedList<>();
