@@ -125,6 +125,11 @@ public class GameSession {
         return started;
     }
 
+    /** true si la partida ya termino (un solo jugador activo, limite de turnos o "Terminar partida"). */
+    public synchronized boolean isFinished() {
+        return finished;
+    }
+
     /** Nombre del jugador en turno, o null si la partida no ha iniciado. */
     public synchronized String currentPlayer() {
         return started ? turns.getCurrentTurn().getName() : null;
@@ -210,8 +215,36 @@ public class GameSession {
         if (!diceRolled) return "DEBES_LANZAR_PRIMERO";
         // El alquiler es obligatorio; la compra no (terminar el turno es no comprar)
         if (deudor != null && propiedadPendiente.getOwner() != null) return "PAGO_PENDIENTE";
+        if (turnNumber >= Tablero.MAX_TURNOS) {
+            // Era el ultimo turno permitido: el resultado sale con takeNotices()
+            terminarPorLimite(avisos);
+            return OK;
+        }
         avanzarTurno();
         return OK;
+    }
+
+    /**
+     * Se jugo el ultimo turno permitido (Tablero.MAX_TURNOS): la partida termina y
+     * gana el jugador activo con mayor patrimonio (saldo + valor de sus propiedades).
+     * Si hay empate, gana el que se registro primero.
+     */
+    private void terminarPorLimite(StringBuilder out) {
+        finished = true;
+        deudor = null;
+        propiedadPendiente = null;
+        linea(out, "MENSAJE,Se alcanzó el límite de " + Tablero.MAX_TURNOS
+                + " turnos. Gana el mayor patrimonio (saldo + propiedades)");
+        Player ganador = null;
+        for (int i = 0; i < count; i++) {
+            Player p = players[i];
+            if (!p.isActive()) continue;
+            linea(out, "MENSAJE,Patrimonio de " + p.getName() + ": " + dinero(p.calculateNetWorth()));
+            if (ganador == null || p.calculateNetWorth() > ganador.calculateNetWorth()) {
+                ganador = p;
+            }
+        }
+        linea(out, "GANADOR," + ganador.getName());
     }
 
     /**
@@ -476,6 +509,8 @@ public class GameSession {
             deudor = null;
             propiedadPendiente = null;
             linea(out, "GANADOR," + ganador.getName());
+        } else if (turnNumber >= Tablero.MAX_TURNOS) {
+            terminarPorLimite(out); // el eliminado jugaba el ultimo turno permitido
         } else {
             avanzarTurno();
             out.append(avisos); // turnos saltados por la carcel, antes del TURNO

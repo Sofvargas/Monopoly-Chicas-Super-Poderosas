@@ -17,6 +17,9 @@ public class Tablero {
 
     public static final double SALARIO_POR_VUELTA = 200;
     public static final int TURNOS_EN_CARCEL = 2; // turnos que pierde quien cae en la carcel
+    // Cantidad maxima de turnos de la partida (configurable aqui). Al terminar el
+    // ultimo turno gana el jugador con mayor patrimonio: saldo + valor de sus propiedades.
+    public static final int MAX_TURNOS = 40;
 
     public static CircularDoublyLinkedList<Square> crear() {
         CircularDoublyLinkedList<Square> tablero = new CircularDoublyLinkedList<>();
