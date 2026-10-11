@@ -36,7 +36,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *     PROPIEDAD,jugador,indice,casilla (a todos) el jugador compro esa casilla
  *     CARTA,jugador,descripcion (a todos) carta sorpresa que saco el jugador
  *     ELIMINADO,jugador         (a todos) no pudo pagar un alquiler y sale del juego
- *     GANADOR,jugador           (a todos) solo queda un jugador: fin de la partida
+ *     GANADOR,jugador           (a todos) fin de la partida: queda un solo jugador, o se llego
+ *                               al limite de turnos y gano el de mayor patrimonio
  *     HISTORIAL_INICIO,jugador  (a todos) 'jugador' termino la partida; siguen las transacciones
  *     TRANSACCION,id,turno,tipo,origen,destino,monto,descripcion   (a todos) una por linea
  *     HISTORIAL_FIN             (a todos) fin del historial: la ventana ya puede mostrarlo
@@ -156,7 +157,10 @@ public class ClientHandler implements Runnable {
         for (String line : BankServer.session().takeNotices()) {
             BankServer.broadcast(line);
         }
-        BankServer.broadcast("TURNO," + BankServer.session().currentPlayer());
+        // Si era el ultimo turno permitido, los avisos ya anunciaron al ganador: no hay turno nuevo
+        if (!BankServer.session().isFinished()) {
+            BankServer.broadcast("TURNO," + BankServer.session().currentPlayer());
+        }
     }
 
     private void sendState() {
